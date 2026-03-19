@@ -109,8 +109,7 @@ For more details, see the `LICENSE` file.
 
 ## 👨‍💻 Developer
 
-**LinuxUsersLinuxMint**
-Founder of **OpenSoftware-World**
+**OpenSoftware-World**
 
 ---
 
