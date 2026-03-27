@@ -69,8 +69,7 @@ void print_time() {
     buf[18] = '0' + (sys_time.seconds % 10);
     buf[19] = 0;
 
-    vga_print_scr(buf);
-    vga_newline();
+    vga_print_scr_nw(buf);
 }
 
 void sleep(uint32_t seconds) {
