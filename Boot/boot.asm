@@ -9,7 +9,7 @@ section .text
 _start:
 
     cmp eax, 0x2BADB002
-    jne  hang
+    jne hang
     cli
     mov esp, 0x9FC00
 
