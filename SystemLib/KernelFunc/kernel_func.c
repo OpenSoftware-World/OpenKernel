@@ -7,7 +7,7 @@ extern void example_func(void);
 func_table_t ftable[] = {
     {"", },
     {0, 0}
-}
+};
 
 void exec_func(const char *func_name) {
     for (int i = 0; ftable[i].name != 0; i++) {
