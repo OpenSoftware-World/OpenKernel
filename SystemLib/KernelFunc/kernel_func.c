@@ -1,9 +1,5 @@
 #include "kernel_func.h"
 
-/*
-extern void example_func(void);
-*/
-
 func_table_t ftable[] = {
     {"", },
     {0, 0}
