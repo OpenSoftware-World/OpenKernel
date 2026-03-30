@@ -8,8 +8,8 @@ BUILD = build
 ISO = iso
 
 # Kernel
-KERNEL = $(BUILD)/OpenKernel.bin
-ISOFILE = OpenKernel_1.0.iso
+KERNEL = $(BUILD)/patios_1.0_openkernel_based.bin
+ISOFILE = patios_1.0_openkernel_based.iso
 
 # Compile Tools
 CFLAGS = -m32 -ffreestanding -O2 -Wall -Wextra -ISystemLib/Std -IDrivers/Vga
@@ -17,7 +17,7 @@ LDFLAGS = -m elf_i386 -T link.ld
 
 # Source Files
 ASM_SRC = Boot/boot.asm Boot/Mboot_desc/mboot.asm
-C_SRC = main.c Drivers/Vga/vga.c SystemLib/SysCalls/basic_syscall.c SystemLib/TimeMng/time.c Kernel/KernelServices/SystemManagement/sysmng.c Kernel/KernelServices/Shell/shell.c SystemLib/Std/std.c Drivers/Keyboard/keyboard.c
+C_SRC = main.c Drivers/Vga/vga.c SystemLib/SysCalls/basic_syscall.c SystemLib/TimeMng/time.c Kernel/KernelServices/SystemManagement/sysmng.c SystemLib/Std/std.c Drivers/Keyboard/keyboard.c
 
 # Obj
 ASM_OBJ = $(ASM_SRC:%.asm=$(BUILD)/%.o)

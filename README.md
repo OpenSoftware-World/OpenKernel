@@ -1,4 +1,4 @@
-# 🚀 OpenKernel
+# 🚀 PatiOS-OpenKernelBased
 
 > A modern, modular, and learning-oriented operating system kernel project.
 
