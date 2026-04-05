@@ -75,4 +75,25 @@ static inline uint32_t inl(uint16_t port) {
     return ret;
 }
 
+static inline void insw(uint16_t port, void* addr, uint32_t count) {
+    __asm__ __volatile__ ("rep insw"
+                            : "+D"(addr), "+c"(count)
+                            : "d"(port)
+                            : "memory");
+}
+
+static inline void outsw(uint16_t port, const void* addr, uint32_t count) {
+    __asm__ __volatile__ ("rep outsw"
+                            : "+S"(addr), "+c"(count)
+                        : "d"(port));
+}
+
+static inline void sys_wait(void) {
+    __asm__ __volatile__ ("outb %%al, $0x80": :"a"(0): "memory");
+}
+
+static inline void sys_barrier(void) {
+    __asm__ __volatile__ ("" ::: "memory");
+}
+
 #endif
