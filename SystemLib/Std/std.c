@@ -23,3 +23,20 @@ int strlen(const char *str) {
     while (*str++) len++;
     return len;
 }
+
+void strcpy(char* dst, const char *src) {
+    while (*src) {
+        *dst++ = *src++;
+    }
+    *dst = 0;
+}
+
+void strncpy(char* dst, const char *src, unsigned int n) {
+    unsigned int i;
+    for (i = 0; i < n && src[i]; i++) {
+        dst[i] = src[i];
+    }
+    if (i < n) {
+        dst[i] = 0;
+    }
+}
