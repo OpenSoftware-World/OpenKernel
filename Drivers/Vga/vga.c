@@ -81,6 +81,55 @@ void vga_print_hex(uint32_t n) {
     }
 }
 
+void vga_print_dec(int num) {
+    char buf[12];
+    int i = 0;
+
+    if (num == 0) {
+        ptchar('0');
+        return;
+    }
+    if (num < 0) {
+        ptchar('-');
+        num = -num;
+    }
+    while (num > 0) {
+        buf[i++] = (num % 10) + '0';
+        num /= 10;
+    }
+    while (i--) {
+        ptchar(buf[i]);
+    }
+}
+
+void vga_print_bin(unsigned int num) {
+    int started = 0;
+    for (int i = 31; i >= 0; i--) {
+        if (num & (1u << i)) {
+            ptchar('1');
+            started = 1;
+        } else if (started) {
+            ptchar('0');
+        }
+    }
+    if (!started) {
+        ptchar('0');
+    }
+}
+
+void vga_cursor_mode(const char *mode, uint8_t start, uint8_t end) {
+    if (mode[0] == 'E') {
+        outb(0x3D4, 0x0A);
+        outb(0x3D5, start & 0x1F);
+        outb(0x3D4, 0x0B);
+        outb(0x3D5, end & 0x1F);
+    }
+    else if (mode[0] == 'D') {
+        outb(0x3D4, 0x0A);
+        outb(0x3D5, 0x20);
+    }
+}
+
 void vga_print_scr_nw(const char *str) {
     vga_print_scr(str);
     vga_newline();

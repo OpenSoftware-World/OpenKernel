@@ -19,6 +19,9 @@ void ptchar(char c);
 void vga_print_scr_nw(const char *str);
 void vga_set_color_scheme(uint8_t bg_color, uint8_t text_color);
 void vga_print_hex(uint32_t n);
+void vga_print_dec(int num);
+void vga_print_bin(unsigned int num);
+void vga_cursor_mode(const char *mode, uint8_t start, uint8_t end);
 
 #define VGA_COLOR_BLACK 0x0
 #define VGA_COLOR_BLUE 0x1
@@ -46,8 +49,8 @@ Example: VGA_COLOR_BLUE 0x1 -> 1: Blue background color
 #define VGA_ENTRY(ch, color) ((uint16_t)ch | (color << 8))
 
 #define VGA_DRIVER_NAME "OpenKernel VGA Driver"
-#define VGA_DRIVER_VER "0.2"
+#define VGA_DRIVER_VER "0.3"
 #define VGA_DRIVER_DESC "A simple VGA text mode driver for OpenKernel"
-#define VGA_DRIVER_KRNL_VER "1.0"
+#define VGA_DRIVER_KRNL_VER "2.0"
 
 #endif
