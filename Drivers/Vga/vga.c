@@ -90,7 +90,7 @@ void vga_newline() {
     cx = 0;
     cy++;
 
-    if (cy >= VHEIGHT) {
+    if (cy >= VHEIGHT - 1) {
         vga_clear_screen("C");
     }
     vga_set_cursor(cx, cy);
