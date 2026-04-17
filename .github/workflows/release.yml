@@ -54,7 +54,7 @@ jobs:
           else
             CURRENT=${HASHES[0]}
             PREVIOUS=${HASHES[1]}
-            COMMITS=$(echo "$COMMITS" | sed -E "s/#([0-9]+)/[#\1](https:\/\/github.com\/$REPO\/commits?query=%23\1)/g")
+            COMMITS=$(git log $PREVIOUS..$CURRENT --pretty=format:"- %s")
           fi
 
           echo "## 🕒 Changes:" > CHANGELOG.md
