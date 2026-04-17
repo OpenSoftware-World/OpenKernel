@@ -1,6 +1,6 @@
 #include "time.h"
-#include "../../Drivers/Vga/vga.h"
-#include "../SystemIO/io.h"
+#include <OpenKernel/Drivers/Vga/vga.h>
+#include <OpenKernel/SystemLib/SystemIO/io.h>
 
 systime sys_time = {0, 0, 0, 0, 0, 0};
 

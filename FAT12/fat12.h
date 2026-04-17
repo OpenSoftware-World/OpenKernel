@@ -1,7 +1,7 @@
 #ifndef FAT12_H
 #define FAT12_H
 
-#include "../SystemLib/Std/types.h"
+#include <OpenKernel/SystemLib/Std/types.h>
 
 #define FAT12_EOC 0x0FF8
 #define FAT12_BAD_CLUSER 0x0FF7

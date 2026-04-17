@@ -1,5 +1,5 @@
 #include "ata.h"
-#include "../../SystemLib/SystemIO/io.h"
+#include <OpenKernel/SystemLib/SystemIO/io.h>
 
 static void ata_wait_busy() {
     while (inb(ATA_STATUS) & ATA_STATUS_BSY);

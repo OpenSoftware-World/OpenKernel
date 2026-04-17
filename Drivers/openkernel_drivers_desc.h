@@ -1,7 +1,7 @@
 #ifndef OPENKERNEL_DRIVERS_DESC_H
 #define OPENKERNEL_DRIVERS_DESC_H
 
-#include "../SystemLib/Std/types.h"
+#include <OpenKernel/SystemLib/Std/types.h>
 
 typedef struct {
     uint8_t driver_name;

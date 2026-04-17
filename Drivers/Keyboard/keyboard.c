@@ -1,5 +1,5 @@
 #include "keyboard.h"
-#include "../../SystemLib/SystemIO/io.h"
+#include <OpenKernel/SystemLib/SystemIO/io.h>
 
 #define KBD_DATA 0x60
 #define KBD_STAT 0x64

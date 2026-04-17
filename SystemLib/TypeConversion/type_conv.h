@@ -1,7 +1,7 @@
 #ifndef TYPE_CONV_H
 #define TYPE_CONV_H
 
-#include "../Std/types.h"
+#include <OpenKernel/SystemLib/Std/types.h>
 
 char* itoa(int val, char* str);
 char* htoa(uint32_t val, char* str);

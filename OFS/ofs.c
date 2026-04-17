@@ -1,9 +1,9 @@
 #include "ofs.h"
-#include "../Drivers/Ata/ata.h"
-#include "../SystemLib/Std/std.h"
-#include "../SystemLib/Std/types.h"
-#include "../SystemLib/Memory/mem.h"
-#include "../Drivers/Vga/vga.h"
+#include <OpenKernel/Drivers/Ata/ata.h>
+#include <OpenKernel/SystemLib/Std/std.h>
+#include <OpenKernel/SystemLib/Std/types.h>
+#include <OpenKernel/SystemLib/Memory/mem.h>
+#include <OpenKernel/Drivers/Vga/vga.h>
 
 ofs_t ofs;
 

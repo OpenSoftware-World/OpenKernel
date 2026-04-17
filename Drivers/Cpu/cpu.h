@@ -1,7 +1,7 @@
 #ifndef CPU_H
 #define CPU_H
 
-#include "../../SystemLib/Std/types.h"
+#include <OpenKernel/SystemLib/Std/types.h>
 
 typedef struct {
     char sys_cpu_brand[49];

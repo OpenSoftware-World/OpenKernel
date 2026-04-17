@@ -1,7 +1,7 @@
 #ifndef OFS_H
 #define OFS_H
 
-#include "../SystemLib/Std/types.h"
+#include <OpenKernel/SystemLib/Std/types.h>
 
 #define OFS_NAME_MAX_LENGTH 32
 #define OFS_MAX_FILES 128

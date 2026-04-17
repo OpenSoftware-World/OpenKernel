@@ -1,7 +1,7 @@
 #ifndef KEYBOARD_H
 #define KEYBOARD_H
 
-#include "../../SystemLib/Std/types.h"
+#include <OpenKernel/SystemLib/Std/types.h>
 
 #define KEY_BF_SIZE 256
 

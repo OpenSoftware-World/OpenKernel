@@ -1,7 +1,7 @@
 #ifndef KERNEL_FUNC_H
 #define KERNEL_FUNC_H
 
-#include "../Std/std.h"
+#include <OpenKernel/SystemLib/Std/std.h>
 #include "extern_func.h"
 
 /*

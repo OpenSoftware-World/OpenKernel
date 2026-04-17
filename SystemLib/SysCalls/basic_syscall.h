@@ -1,8 +1,8 @@
 #ifndef BASIC_SYSCALL_H
 #define BASIC_SYSCALL_H
 
-#include "../../Drivers/Vga/vga.h"
-#include "../../Kernel/KernelServices/SystemManagement/sysmng.h"
+#include <OpenKernel/Drivers/Vga/vga.h>
+#include <OpenKernel/Kernel/KernelServices/SystemManagement/sysmng.h>
 
 #define SYSCALL_PRINT 0
 #define SYSCALL_CLEAR_SCREEN 1

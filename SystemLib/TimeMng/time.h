@@ -1,7 +1,7 @@
 #ifndef TIME_H
 #define TIME_H
 
-#include "../Std/types.h"
+#include <OpenKernel/SystemLib/Std/types.h>
 
 typedef struct {
     uint8_t seconds;

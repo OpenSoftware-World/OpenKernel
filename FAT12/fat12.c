@@ -1,6 +1,6 @@
 #include "fat12.h"
-#include "../Drivers/Ata/ata.h"
-#include "../SystemLib/Std/std.h"
+#include <OpenKernel/Drivers/Ata/ata.h>
+#include <OpenKernel/SystemLib/Std/std.h>
 
 static fat12_fs_t fs;
 

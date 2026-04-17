@@ -1,5 +1,5 @@
 #include "vga.h"
-#include "../../SystemLib/SystemIO/io.h"
+#include <OpenKernel/SystemLib/SystemIO/io.h>
 
 static uint16_t *vgabuffer = (uint16_t *)VBUFFER;
 static uint8_t txt_color = VGA_COLOR(VGA_COLOR_BLACK, VGA_COLOR_LIGHT_GREY);

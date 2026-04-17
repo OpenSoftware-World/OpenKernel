@@ -5,7 +5,7 @@
  * ATA Driver for OpenKernel
 */
 
-#include "../../SystemLib/Std/types.h"
+#include <OpenKernel/SystemLib/Std/types.h>
 
 #define ATA_DATA 0x1F0
 #define ATA_ERROR 0x1F1

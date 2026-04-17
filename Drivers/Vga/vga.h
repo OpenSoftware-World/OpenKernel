@@ -1,7 +1,7 @@
 #ifndef VGA_H
 #define VGA_H
 
-#include "../../SystemLib/Std/types.h"
+#include <OpenKernel/SystemLib/Std/types.h>
 
 #define VWIDTH 80
 #define VHEIGHT 25
