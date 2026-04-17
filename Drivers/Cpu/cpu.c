@@ -44,3 +44,7 @@ void sti(void) {
 void hlt(void) {
     __asm__ __volatile__ ("hlt");
 }
+
+void nop(void) {
+    __asm__ __volatile__ ("nop");
+}

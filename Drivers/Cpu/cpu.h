@@ -31,6 +31,7 @@ void cpu_status(const char *mode);
 void cli(void);
 void sti(void);
 void hlt(void);
+void nop(void);
 
 #define CPU_DRIVER_NAME "OpenKernel CPU Driver"
 #define CPU_DRIVER_VER "0.3"
