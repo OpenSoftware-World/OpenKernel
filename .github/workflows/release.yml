@@ -1,0 +1,68 @@
+name: Build & Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "version.txt"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(cat version.txt)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create OpenKernel package folder
+        run: |
+          mkdir -p package/OpenKernel
+
+          rsync -av \
+            --exclude='package' \
+            ./ package/OpenKernel/
+
+      - name: Create ZIP package
+        run: |
+          cd package
+          zip -r OpenKernel_${{ steps.version.outputs.version }}.zip OpenKernel
+
+      - name: Generate Changelog (version.txt based)
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          VERSION_COMMITS=$(git log --pretty=format:"%H" -- version.txt)
+          HASHES=($VERSION_COMMITS)
+
+          if [ ${#HASHES[@]} -lt 2 ]; then
+            COMMITS=$(git log --pretty=format:"- %s")
+          else
+            CURRENT=${HASHES[0]}
+            PREVIOUS=${HASHES[1]}
+            COMMITS=$(git log $PREVIOUS..$CURRENT --pretty=format:"- %s")
+          fi
+
+          echo "## 🚀 OpenKernel v$VERSION" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "$COMMITS" >> CHANGELOG.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: openkernel-${{ steps.version.outputs.version }}
+          name: OpenKernel ${{ steps.version.outputs.version }}
+          body_path: CHANGELOG.md
+          files: |
+            package/OpenKernel_${{ steps.version.outputs.version }}.zip
