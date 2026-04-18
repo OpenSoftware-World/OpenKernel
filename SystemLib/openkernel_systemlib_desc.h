@@ -1,7 +1,7 @@
 #ifndef OPENKERNEL_SYSTEMLIB_DESC_H
 #define OPENKERNEL_SYSTEMLIB_DESC_H
 
-#include "Std/types.h"
+#include <OpenKernel/SystemLib/Std/types.h>
 
 #define OPENKERNEL_SYSTEMLIB_PKG_NAME "OpenKernel System Libraries"
 #define OPENKERNEL_SYSTEMLIB_PKG_VER "1.0"
