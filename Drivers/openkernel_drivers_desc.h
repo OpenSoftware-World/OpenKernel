@@ -4,11 +4,11 @@
 #include <OpenKernel/SystemLib/Std/types.h>
 
 typedef struct {
-    uint8_t driver_name;
-    uint8_t driver_desc;
-    uint8_t driver_ver;
-    uint8_t driver_author;
-    uint8_t driver_krnl_ver;
+    const char *driver_name;
+    const char *driver_desc;
+    const char *driver_ver;
+    const char *driver_author;
+    const char *driver_krnl_ver;
 } openkernel_drivers_information;
 
 #endif
