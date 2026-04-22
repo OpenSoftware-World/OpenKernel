@@ -12,4 +12,11 @@
 int syscall(int id, void* arg);
 int syscall_handler(int id, void* arg);
 
+#define BASIC_SYSCALL_MODULE_NAME "Syscall Library"
+#define BASIC_SYSCALL_MODULE_DESC "Syscall Library for OpenKernel"
+#define BASIC_SYSCALL_MODULE_VER "1.0"
+#define BASIC_SYSCALL_MODULE_AUTHOR "OpenSoftware-World"
+#define BASIC_SYSCALL_MODULE_FILE_NAME "basic_syscall.lib"
+#define BASIC_SYSCALL_MODULE_KRNL_VER "2.0"
+
 #endif

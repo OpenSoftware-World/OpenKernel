@@ -22,4 +22,11 @@ typedef double float64_t;
 
 #define NULL ((void *)0)
 
+#define TYPES_MODULE_NAME "Types Library"
+#define TYPES_MODULE_DESC "Types Library for OpenKernel"
+#define TYPES_MODULE_VER "1.0"
+#define TYPES_MODULE_AUTHOR "OpenSoftware-World"
+#define TYPES_MODULE_FILE_NAME "types.lib"
+#define TYPES_MODULE_KRNL_VER "2.0"
+
 #endif

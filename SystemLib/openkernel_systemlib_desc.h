@@ -13,6 +13,8 @@ typedef struct {
     const char *module_author;
     const char *module_file_name;
     const char *module_krnl_ver;
-} openkernel_systemlib_module_information;
+} openkernel_systemlib_module_information_t;
+
+
 
 #endif

@@ -11,4 +11,11 @@ void heap_init(uint32_t start, uint32_t size);
 void* kmalloc(uint32_t size);
 void kfree(void* ptr);
 
+#define MEM_MODULE_NAME "Memory Library"
+#define MEM_MODULE_DESC "Memory Library for OpenKernel"
+#define MEM_MODULE_VER "1.0"
+#define MEM_MODULE_AUTHOR "OpenSoftware-World"
+#define MEM_MODULE_FILE_NAME "mem.lib"
+#define MEM_MODULE_KRNL_VER "2.0"
+
 #endif
