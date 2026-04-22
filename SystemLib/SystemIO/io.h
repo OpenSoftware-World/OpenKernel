@@ -96,8 +96,8 @@ static inline void sys_barrier(void) {
     __asm__ __volatile__ ("" ::: "memory");
 }
 
-#define IO_MODULE_NAME "IO Library"
-#define IO_MODULE_DESC "IO Library for OpenKernel"
+#define IO_MODULE_NAME "I/O Library"
+#define IO_MODULE_DESC "I/O Library for OpenKernel"
 #define IO_MODULE_VER "1.0"
 #define IO_MODULE_AUTHOR "OpenSoftware-World"
 #define IO_MODULE_FILE_NAME "io.lib"
