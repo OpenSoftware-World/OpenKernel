@@ -118,6 +118,10 @@ void vga_print_bin(unsigned int num) {
 }
 
 void vga_cursor_mode(const char *mode, uint8_t start, uint8_t end) {
+    /*
+        E: Enable
+        D: Disable
+    */
     if (mode[0] == 'E') {
         outb(0x3D4, 0x0A);
         outb(0x3D5, start & 0x1F);
