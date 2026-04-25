@@ -1,7 +1,7 @@
 #include "vmem.h"
 
-static uint32_t page_dir[1024] __attribute__((aligned(4096)));
-static uint32_t first_page_table[1024] __attribute__((4096));
+static uint32_t page_directory[1024] __attribute__((aligned(4096)));
+static uint32_t first_page_table[1024] __attribute__((aligned(4096)));
 
 void paging_init() {
     for (int i = 0; i < 1024; i++) {
