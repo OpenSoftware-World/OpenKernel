@@ -1,0 +1,14 @@
+To make sure you're ready to develop an OpenKernel-based operating system, do the following (Applies only to Linux distributions.):
+
+* Open your terminal and type “chmod +x install_pkg.sh”, then type ./install_pkg.sh to download the essential packages you need to get started with system development. (You will need to download the i686-elf-gcc package yourself.)
+
+Now let’s get to what you need to do to develop your OpenKernel-based operating system:
+
+* Write your own bootloader, or write a multiboot header to use the Grub bootloader (When writing the bootloader, please write it according to the ENTRY variable in the link.ld file.).
+* Add the bootsloader you wrote to the ASM_SRC variable on line 19 of the Makefile. (Example: Boot/boot.asm)
+* Please do not make any changes to the OpenKernel folder!
+* Next, start writing your own operating system and add the files you’ve created to the C_SRC variable on line 20 of the Makefile.
+* You can modify the Makefile as you see fit. 
+* To add more features while developing your operating system, please use the latest version of OpenKernel.
+
+I hope you enjoy developing your operating system.
