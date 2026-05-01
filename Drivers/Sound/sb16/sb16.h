@@ -29,4 +29,10 @@ int sb16_wait_ready();
 void sb16_gen_flat_sound(uint8_t level);
 void sb16_test();
 
+#define SB16_DRIVER_NAME "OpenKernel SB16 Sound Card Driver"
+#define SB16_DRIVER_VER "0.1"
+#define SB16_DRIVER_DESC "Sound Blaster 16 compatible sound card driver for OpenKernel"
+#define SB16_DRIVER_AUTHOR "OpenSoftware-World"
+#define SB16_DRIVER_KRNL_VER "2.0"
+
 #endif

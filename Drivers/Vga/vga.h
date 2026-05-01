@@ -49,7 +49,7 @@ Example: VGA_COLOR_BLUE 0x1 -> 1: Blue background color
 #define VGA_ENTRY(ch, color) ((uint16_t)ch | (color << 8))
 
 #define VGA_DRIVER_NAME "OpenKernel VGA Driver"
-#define VGA_DRIVER_VER "0.3"
+#define VGA_DRIVER_VER "0.4"
 #define VGA_DRIVER_DESC "A simple VGA text mode driver for OpenKernel"
 #define VGA_DRIVER_AUTHOR "OpenSoftware-World"
 #define VGA_DRIVER_KRNL_VER "2.0"

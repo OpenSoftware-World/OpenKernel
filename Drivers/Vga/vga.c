@@ -1,28 +1,42 @@
 #include "vga.h"
-#include <OpenKernel/SystemLib/SystemIO/io.h>
+#include "../../SystemLib/SystemIO/io.h"
+
+#define SCREEN_SIZE (VWIDTH * VHEIGHT)
 
 static uint16_t *vgabuffer = (uint16_t *)VBUFFER;
+uint16_t screen_buffer[SCREEN_SIZE];
 static uint8_t txt_color = VGA_COLOR(VGA_COLOR_BLACK, VGA_COLOR_LIGHT_GREY);
 static uint8_t cx = 0; // cursor x
 static uint8_t cy = 0; // cursor y
 
 void vga_clear_screen(const char *mode) {
     if (mode[0] == 'F') {
-        for (uint16_t y=0; y < VHEIGHT; y++) {
-            for (uint16_t x=0; x < VWIDTH; x++) {
-                vgabuffer[y * VWIDTH + x] = VGA_ENTRY(' ', txt_color);
+        for (uint16_t y = 0; y < VHEIGHT; y++) {
+            for (uint16_t x = 0; x < VWIDTH; x++) {
+
+                uint16_t cell = VGA_ENTRY(' ', txt_color);
+
+                vgabuffer[y * VWIDTH + x] = cell;
+                screen_buffer[y * VWIDTH + x] = cell;
             }
         }
+
         cx = 0;
         cy = 0;
-    } else if (mode[0] == 'C') {
-        for (int y = 1; y < VHEIGHT - 1; y++) {
-        for (int x = 0; x < VWIDTH; x++) {
-            vgabuffer[y * VWIDTH + x] = VGA_ENTRY(' ', txt_color);
-        }
     }
-    cx = 0;
-    cy = 1;
+    else if (mode[0] == 'C') {
+        for (uint16_t y = 1; y < VHEIGHT - 1; y++) {
+            for (uint16_t x = 0; x < VWIDTH; x++) {
+
+                uint16_t cell = VGA_ENTRY(' ', txt_color);
+
+                vgabuffer[y * VWIDTH + x] = cell;
+                screen_buffer[y * VWIDTH + x] = cell;
+            }
+        }
+
+        cx = 0;
+        cy = 1;
     }
 }
 
@@ -47,16 +61,24 @@ void ptchar(char c) {
         cx = 0;
         cy++;
     } else {
-        vgabuffer[cy * VWIDTH + cx] = VGA_ENTRY(c, txt_color);
+        uint16_t cell = VGA_ENTRY(c, txt_color);
+
+        vgabuffer[cy * VWIDTH + cx] = cell;
+        screen_buffer[cy * VWIDTH + cx] = cell;
+        screen_buffer[cy * VWIDTH + cx] = VGA_ENTRY(c, txt_color);
+
         cx++;
+
         if (cx >= VWIDTH) {
             cx = 0;
             cy++;
         }
     }
+
     if (cy >= VHEIGHT) {
         vga_clear_screen("C");
     }
+
     vga_set_cursor(cx, cy);
 }
 
@@ -64,6 +86,11 @@ void vga_print_scr(const char *str) {
     while (*str) {
         ptchar(*str++);
     }
+}
+
+void vga_print_scr_nw(const char *str) {
+    vga_print_scr(str);
+    vga_newline();
 }
 
 void vga_print_hex(uint32_t n) {
@@ -74,9 +101,10 @@ void vga_print_hex(uint32_t n) {
         hex[7 - i] = digits[n & 0xF];
         n >>= 4;
     }
+
     hex[8] = '\0';
 
-    for(int i = 0; i < 8; i++) {
+    for (int i = 0; i < 8; i++) {
         ptchar(hex[i]);
     }
 }
@@ -89,14 +117,17 @@ void vga_print_dec(int num) {
         ptchar('0');
         return;
     }
+
     if (num < 0) {
         ptchar('-');
         num = -num;
     }
+
     while (num > 0) {
         buf[i++] = (num % 10) + '0';
         num /= 10;
     }
+
     while (i--) {
         ptchar(buf[i]);
     }
@@ -104,6 +135,7 @@ void vga_print_dec(int num) {
 
 void vga_print_bin(unsigned int num) {
     int started = 0;
+
     for (int i = 31; i >= 0; i--) {
         if (num & (1u << i)) {
             ptchar('1');
@@ -112,19 +144,26 @@ void vga_print_bin(unsigned int num) {
             ptchar('0');
         }
     }
+
     if (!started) {
         ptchar('0');
     }
 }
 
+void vga_set_cursor(uint8_t x, uint8_t y) {
+    uint16_t pos = y * VWIDTH + x;
+
+    outb(0x3D4, 0x0F);
+    outb(0x3D5, (uint8_t)(pos & 0xFF));
+    outb(0x3D4, 0x0E);
+    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
+}
+
 void vga_cursor_mode(const char *mode, uint8_t start, uint8_t end) {
-    /*
-        E: Enable
-        D: Disable
-    */
     if (mode[0] == 'E') {
         outb(0x3D4, 0x0A);
         outb(0x3D5, start & 0x1F);
+
         outb(0x3D4, 0x0B);
         outb(0x3D5, end & 0x1F);
     }
@@ -134,11 +173,6 @@ void vga_cursor_mode(const char *mode, uint8_t start, uint8_t end) {
     }
 }
 
-void vga_print_scr_nw(const char *str) {
-    vga_print_scr(str);
-    vga_newline();
-}
-
 void vga_newline() {
     cx = 0;
     cy++;
@@ -146,20 +180,12 @@ void vga_newline() {
     if (cy >= VHEIGHT - 1) {
         vga_clear_screen("C");
     }
+
     vga_set_cursor(cx, cy);
 }
 
 void vga_init() {
     vga_clear_screen("F");
-}
-
-void vga_set_cursor(uint8_t x, uint8_t y) {
-    uint16_t pos = y * 80 + x;
-
-    outb(0x3D4, 0x0F);
-    outb(0x3D5, (uint8_t)(pos & 0xFF));
-    outb(0x3D4, 0x0E);
-    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
 }
 
 void vga_bckspc() {
@@ -171,7 +197,11 @@ void vga_bckspc() {
         cy--;
         cx = VWIDTH - 1;
     }
-    uint16_t *video = (uint16_t*)VBUFFER;
-    video[cy * VWIDTH + cx] = VGA_ENTRY(' ', txt_color);
+
+    uint16_t cell = VGA_ENTRY(' ', txt_color);
+
+    vgabuffer[cy * VWIDTH + cx] = cell;
+    screen_buffer[cy * VWIDTH + cx] = cell;
+
     vga_set_cursor(cx, cy);
 }

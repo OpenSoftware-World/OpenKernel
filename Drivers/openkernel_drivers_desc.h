@@ -11,6 +11,8 @@
 #include <OpenKernel/Drivers/Network/Ethernet/ethernet.h>
 #include <OpenKernel/Drivers/Network/RTL8139/rtl8139.h>
 #include <OpenKernel/Drivers/PCIBus/pci.h>
+#include <OpenKernel/Drivers/Mouse/mouse.h>
+#include <OpenKernel/Drivers/Sound/sb16/sb16.h>
 
 typedef struct {
     const char *driver_name;
@@ -29,6 +31,8 @@ openkernel_drivers_information_t e1000_driver;
 openkernel_drivers_information_t ethernet_driver;
 openkernel_drivers_information_t rtl8139_driver;
 openkernel_drivers_information_t pcibus_driver;
+openkernel_drivers_information_t mouse_driver;
+openkernel_drivers_information_t sb16_driver;
 
 ata_driver = (openkernel_drivers_information_t) {
     .driver_name = ATA_DRIVER_NAME,
@@ -100,6 +104,22 @@ pcibus_driver = (openkernel_drivers_information_t) {
     .driver_ver = PCIBUS_DRIVER_VER,
     .driver_author = PCIBUS_DRIVER_AUTHOR,
     .driver_krnl_ver = PCIBUS_DRIVER_KRNL_VER,
+};
+
+mouse_driver = (openkernel_drivers_information_t) {
+    .driver_name = MOUSE_DRIVER_NAME,
+    .driver_desc = MOUSE_DRIVER_DESC,
+    .driver_ver = MOUSE_DRIVER_VER,
+    .driver_author = MOUSE_DRIVER_AUTHOR,
+    .driver_krnl_ver = MOUSE_DRIVER_KRNL_VER,
+};
+
+sb16_driver = (openkernel_drivers_information_t) {
+    .driver_name = SB16_DRIVER_NAME,
+    .driver_desc = SB16_DRIVER_DESC,
+    .driver_ver = SB16_DRIVER_VER,
+    .driver_author = SB16_DRIVER_AUTHOR,
+    .driver_krnl_ver = SB16_DRIVER_KRNL_VER,
 };
 
 #endif
