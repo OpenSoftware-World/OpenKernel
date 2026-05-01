@@ -35,12 +35,21 @@ jobs:
             --exclude='.github' \
             --exclude='version.txt' \
             --exclude='package' \
+            --exclude='install_pkg.sh' \
+            --exclude='link.ld' \
+            --exclude='Makefile' \
+            --exclude='notes.txt' \
             ./ package/OpenKernel/
+
+          cp install_pkg.sh package/
+          cp link.ld package/
+          cp Makefile package/
+          cp notes.txt package/
 
       - name: Create ZIP package
         run: |
           cd package
-          zip -r OpenKernel_${{ steps.version.outputs.version }}.zip OpenKernel
+          zip -r OpenKernel_${{ steps.version.outputs.version }}.zip OpenKernel install_pkg.sh link.ld Makefile notes.txt
 
       - name: Generate Changelog (version.txt based)
         run: |
