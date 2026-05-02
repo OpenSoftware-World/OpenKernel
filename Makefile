@@ -12,7 +12,7 @@ KERNEL = $(BUILD)/os.bin
 ISOFILE = your_os.iso
 
 # Compile Tools
-CFLAGS = -m32 -ffreestanding -O2 -Wall -Wextra -I .
+CFLAGS = -m32 -ffreestanding -O2 -Wall -Wextra -Werror -fstack-protector -I .
 LDFLAGS = -m elf_i386 -T link.ld
 
 # Source Files
@@ -42,6 +42,7 @@ C_SRC = OpenKernel/Drivers/Vga/vga.c \
 		OpenKernel/Kernel/ErrorHandler/panic.c \
 		OpenKernel/Kernel/KernelServices/LogService/log.c \
 		OpenKernel/Kernel/KernelServices/VirtualMem/vmem.c \
+		OpenKernel/Kernel/KernelServices/SecurityChecker/securchk.c \
 		OpenKernel/SystemLib/TaskMng/task.c \
 		OpenKernel/SystemLib/TypeConversion/type_conv.c
 
