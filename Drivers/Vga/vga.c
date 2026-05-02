@@ -3,11 +3,14 @@
 
 #define SCREEN_SIZE (VWIDTH * VHEIGHT)
 
-static uint16_t *vgabuffer = (uint16_t *)VBUFFER;
+uint16_t *vgabuffer = (uint16_t *)VBUFFER;
+static bool_t vga_enabled_driver = false;
 uint16_t screen_buffer[SCREEN_SIZE];
 static uint8_t txt_color = VGA_COLOR(VGA_COLOR_BLACK, VGA_COLOR_LIGHT_GREY);
 static uint8_t cx = 0; // cursor x
 static uint8_t cy = 0; // cursor y
+
+extern void sleep(uint32_t seconds);
 
 void vga_clear_screen(const char *mode) {
     if (mode[0] == 'F') {
@@ -57,6 +60,8 @@ void vga_set_color_scheme(uint8_t bg_color, uint8_t text_color) {
 }
 
 void ptchar(char c) {
+    if (!vga_enabled_driver) return;
+
     if (c == '\n') {
         cx = 0;
         cy++;
@@ -83,6 +88,8 @@ void ptchar(char c) {
 }
 
 void vga_print_scr(const char *str) {
+    if (!vga_enabled_driver) return;
+
     while (*str) {
         ptchar(*str++);
     }
@@ -186,6 +193,7 @@ void vga_newline() {
 
 void vga_init() {
     vga_clear_screen("F");
+    vga_enabled_driver = true;
 }
 
 void vga_bckspc() {
@@ -204,4 +212,22 @@ void vga_bckspc() {
     screen_buffer[cy * VWIDTH + cx] = cell;
 
     vga_set_cursor(cx, cy);
+}
+
+void vga_close() {
+    sleep(1);
+    vga_clear_screen("F");
+    cx = 0;
+    cy = 0;
+    sleep(1);
+    vgabuffer = 0;
+    screen_buffer = 0;
+    sleep(1);
+    vga_enabled_driver = false;
+}
+
+void screen_init() {
+    for (int i = 0; i < VWIDTH * VHEIGHT; i++) {
+        screen_buffer[i] = vgabuffer[i];
+    }
 }

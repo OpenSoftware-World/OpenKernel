@@ -10,8 +10,10 @@
 #define MOUSE_LEFT_LIMIT 0
 #define MOUSE_RIGHT_LIMIT (VGA_WIDTH - 1)
 
-uint16_t* vga_buffer = (uint16_t*)0xB8000;
+extern uint16_t *vgabuffer = (uint16_t *)0xB8000;
 extern uint16_t screen_buffer[VGA_WIDTH * VGA_HEIGHT];
+
+static bool_t mouse_enabled_driver = false;
 
 static uint8_t mouse_cycle = 0;
 static int8_t mouse_byte[3];
@@ -48,9 +50,11 @@ void mouse_init() {
     mouse_y = 12;
     prev_mouse_x = mouse_x;
     prev_mouse_y = mouse_y;
+    mouse_enabled_driver = true;
 }
 
 void mouse_poll() {
+    if (!mouse_enabled_driver) return;
     uint8_t status = inb(0x64);
 
     if (!(status & 1)) return;
@@ -99,18 +103,21 @@ void mouse_poll() {
 }
 
 void mouse_draw() {
+    if (!mouse_enabled_driver) return;
     uint16_t index = mouse_y * VGA_WIDTH + mouse_x;
 
-    vga_buffer[index] = (0x1F << 8) | 0xDB;
+    vgabuffer[index] = (0x1F << 8) | 0xDB;
 }
 
 void mouse_restore() {
+    if (!mouse_enabled_driver) return;
     uint16_t index = prev_mouse_y * VGA_WIDTH + prev_mouse_x;
 
-    vga_buffer[index] = screen_buffer[index] ? screen_buffer[index] : (' ' | (0x1F << 8));
+    vgabuffer[index] = screen_buffer[index] ? screen_buffer[index] : (' ' | (0x1F << 8));
 }
 
 void mouse_update() {
+    if (!mouse_enabled_driver) return;
     mouse_poll();
 
     if (mouse_x != prev_mouse_x || mouse_y != prev_mouse_y) {
@@ -123,8 +130,13 @@ void mouse_update() {
     }
 }
 
-void screen_init() {
-    for (int i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++) {
-        screen_buffer[i] = vga_buffer[i];
-    }
+void mouse_close() {
+    sleep(1);
+    mouse_cycle = 0;
+    mouse_x = 0;
+    mouse_y = 0;
+    sleep(1);
+    prev_mouse_x = mouse_x;
+    prev_mouse_y = mouse_y;
+    mouse_enabled_driver = false;
 }

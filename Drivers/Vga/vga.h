@@ -8,6 +8,7 @@
 #define VBUFFER 0xB8000
 
 void vga_init();
+void vga_close();
 void vga_clear_screen(const char *mode);
 void vga_set_bg_color(uint8_t color);
 void vga_set_text_color(uint8_t color);
@@ -22,6 +23,7 @@ void vga_print_hex(uint32_t n);
 void vga_print_dec(int num);
 void vga_print_bin(unsigned int num);
 void vga_cursor_mode(const char *mode, uint8_t start, uint8_t end);
+void screen_init();
 
 #define VGA_COLOR_BLACK 0x0
 #define VGA_COLOR_BLUE 0x1
@@ -49,9 +51,9 @@ Example: VGA_COLOR_BLUE 0x1 -> 1: Blue background color
 #define VGA_ENTRY(ch, color) ((uint16_t)ch | (color << 8))
 
 #define VGA_DRIVER_NAME "OpenKernel VGA Driver"
-#define VGA_DRIVER_VER "0.4"
+#define VGA_DRIVER_VER "0.5"
 #define VGA_DRIVER_DESC "A simple VGA text mode driver for OpenKernel"
 #define VGA_DRIVER_AUTHOR "OpenSoftware-World"
-#define VGA_DRIVER_KRNL_VER "2.0"
+#define VGA_DRIVER_KRNL_VER "3.0"
 
 #endif

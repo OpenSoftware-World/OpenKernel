@@ -5,6 +5,9 @@
 #define KBD_STAT 0x64
 
 static bool_t caps_lock = false;
+static bool_t kbd_enabled_driver = false;
+
+extern void sleep(uint32_t seconds);
 
 static const char kmap[128] __attribute__((section(".rodata"))) = {
     0,  27, '1','2','3','4','5','6','7','8','9','0','-','=', '\b',
@@ -19,6 +22,7 @@ static uint8_t buf_head = 0;
 static uint8_t buf_tail = 0;
 
 static char to_upper(char c) {
+    if (!kbd_enabled_driver) return;
     if (caps_lock && c >= 'a' && c <= 'z') {
         return c - 32;
     }
@@ -29,13 +33,16 @@ void kbd_init() {
     buf_head = 0;
     buf_tail = 0;
     caps_lock = false;
+    kbd_enabled_driver = true;
 }
 
 uint8_t kb_check() {
+    if (!kbd_enabled_driver) return;
     return buf_head != buf_tail;
 }
 
 char get_char() {
+    if (!kbd_enabled_driver) return;
     uint8_t scancode;
 
     while (1) {
@@ -64,7 +71,16 @@ char get_char() {
 }
 
 void kbd_hndlr(uint8_t scancode) {
+    if (!kbd_enabled_driver) return;
     if (scancode == 0x3A) {
         caps_lock = !caps_lock;
     }
+}
+
+void kbd_close() {
+    buf_head = 0;
+    buf_tail = 0;
+    sleep(1);
+    caps_lock = false;
+    kbd_enabled_driver = false;
 }
