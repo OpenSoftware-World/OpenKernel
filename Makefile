@@ -20,6 +20,7 @@ ASM_SRC = # Bootloader and assembly files
 C_SRC = OpenKernel/Drivers/Vga/vga.c \
 	    OpenKernel/Drivers/Cpu/cpu.c \
 		OpenKernel/OFS/ofs.c \
+		OpenKernel/Drivers/AHCI/ahci.c \
 		OpenKernel/Drivers/Ata/ata.c \
 		OpenKernel/SystemLib/Memory/mem.c \
 		OpenKernel/Drivers/Mouse/mouse.c \
