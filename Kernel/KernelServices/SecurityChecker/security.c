@@ -1,4 +1,4 @@
-#include "securchk.h"
+#include "security.h"
 
 #include <OpenKernel/Drivers/Vga/vga.h>
 #include <OpenKernel/SystemLib/Std/std.h>

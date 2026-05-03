@@ -12,7 +12,7 @@ KERNEL = $(BUILD)/os.bin
 ISOFILE = your_os.iso
 
 # Compile Tools
-CFLAGS = -m32 -ffreestanding -O2 -Wall -Wextra -Werror -fstack-protector -I .
+CFLAGS = -m32 -ffreestanding -O2 -Wall -Wextra -I .
 LDFLAGS = -m elf_i386 -T link.ld
 
 # Source Files
@@ -20,7 +20,7 @@ ASM_SRC = # Bootloader and assembly files
 C_SRC = OpenKernel/Drivers/Vga/vga.c \
 	    OpenKernel/Drivers/Cpu/cpu.c \
 		OpenKernel/OFS/ofs.c \
-		OpenKernel/Drivers/AHCI/ahci.c \
+		OpenKernel/Drivers/Ahci/ahci.c \
 		OpenKernel/Drivers/Ata/ata.c \
 		OpenKernel/SystemLib/Memory/mem.c \
 		OpenKernel/Drivers/Mouse/mouse.c \
@@ -43,7 +43,7 @@ C_SRC = OpenKernel/Drivers/Vga/vga.c \
 		OpenKernel/Kernel/ErrorHandler/panic.c \
 		OpenKernel/Kernel/KernelServices/LogService/log.c \
 		OpenKernel/Kernel/KernelServices/VirtualMem/vmem.c \
-		OpenKernel/Kernel/KernelServices/SecurityChecker/securchk.c \
+		OpenKernel/Kernel/KernelServices/SecurityChecker/security.c \
 		OpenKernel/SystemLib/TaskMng/task.c \
 		OpenKernel/SystemLib/TypeConversion/type_conv.c
 

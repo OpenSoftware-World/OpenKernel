@@ -1,5 +1,5 @@
-#ifndef SECURCHK_H
-#define SECURCHK_H
+#ifndef SECURITY_H
+#define SECURITY_H
 
 #include <OpenKernel/SystemLib/Std/types.h>
 
@@ -51,10 +51,5 @@ int  securchk_get_overall_status(securchk_result_t* result);
 
 void securchk_stack_canary_set(uint32_t* stack, uint32_t stack_size);
 int  securchk_stack_canary_check(uint32_t* stack, uint32_t stack_size);
-
-#define SECURCHK_MODULE_NAME "Security Checker"
-#define SECURCHK_MODULE_DESC "Kernel Security Checker for OpenKernel"
-#define SECURCHK_MODULE_VER "1.0"
-#define SECURCHK_MODULE_AUTHOR "OpenSoftware-World"
 
 #endif
