@@ -22,6 +22,18 @@ void get_sys_cpuinfo(const char *mode) {
         vga_print_scr("CPU Brand: ");
         vga_print_scr_nw(cpuinfo.sys_cpu_brand);
     }
+    else if (mode[0] == 'V') {
+        sys_cpuinfo_t cpuinfo;
+        uint32_t *p = (uint32_t*)cpuinfo.sys_cpu_vendor;
+        uint32_t regs[4];
+        cpuinfo_data(&regs[0], &regs[1], &regs[2], &regs[3], 0x00000000);
+        p[0] = regs[1];
+        p[1] = regs[3];
+        p[2] = regs[2];
+        cpuinfo.sys_cpu_vendor[12] = '\0';
+        vga_print_scr("CPU Vendor: ");
+        vga_print_scr_nw(cpuinfo.sys_cpu_vendor);
+    }
 }
 
 void cpu_status(const char *mode) {
