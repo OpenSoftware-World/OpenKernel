@@ -1,4 +1,5 @@
 #include "panic.h"
+#include <OpenKernel/Drivers/Cpu/cpu.h>
 
 void kernel_panic(const char *msg, const char *error_code) {
     vga_clear_screen("F");
@@ -13,6 +14,6 @@ void kernel_panic(const char *msg, const char *error_code) {
     vga_print_scr_nw(error_code);
     
     while (1) {
-        __asm__ __volatile__ ("hlt");
+        hlt();
     } 
 }
