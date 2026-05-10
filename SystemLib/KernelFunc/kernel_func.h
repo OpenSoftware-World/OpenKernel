@@ -17,6 +17,7 @@ void register_func(const char *name, kfunc_t func);
 Function Run
 */
 void exec_func(const char *func_name);
+void exec_command(const char *command_name);
 
 #define KERNEL_FUNC_MODULE_NAME "Kernel Func Library"
 #define KERNEL_FUNC_MODULE_DESC "Kernel Func Library for OpenKernel"

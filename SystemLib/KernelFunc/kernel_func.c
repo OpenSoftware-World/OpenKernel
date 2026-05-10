@@ -1,6 +1,6 @@
 #include "kernel_func.h"
 
-#define MAX_FUNC 128
+#define MAX_FUNC 256
 
 typedef struct {
     const char *name;
@@ -26,4 +26,8 @@ void exec_func(const char *func_name) {
             return;
         }
     }
+}
+
+void exec_command(const char *command_name) {
+    exec_func(command_name);
 }
