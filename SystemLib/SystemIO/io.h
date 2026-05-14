@@ -88,6 +88,20 @@ static inline void outsw(uint16_t port, const void* addr, uint32_t count) {
                         : "d"(port));
 }
 
+static inline void insb(uint16_t port, void* addr, uint32_t count) {
+    __asm__ __volatile__("rep insb"
+        : "+D"(addr), "+c"(count)
+        : "d"(port)
+        : "memory");
+}
+
+static inline void outsb(uint16_t port, const void* addr, uint32_t count) {
+    __asm__ __volatile__("rep outsb"
+        : "+S"(addr), "+c"(count)
+        : "d"(port)
+        : "memory");
+}
+
 static inline void sys_wait(void) {
     __asm__ __volatile__ ("outb %%al, $0x80": :"a"(0): "memory");
 }
@@ -96,11 +110,25 @@ static inline void sys_barrier(void) {
     __asm__ __volatile__ ("" ::: "memory");
 }
 
+static inline void mem_fence(void) {
+    __asm__ __volatile__("mfence":::"memory");
+}
+
+static inline uint32_t eflags_r(void) {
+    uint32_t flags;
+    __asm__ __volatile__(
+        "pushf\n\t"
+        "pop %0"
+        : "=r"(flags)
+    );
+    return flags;
+}
+
 #define IO_MODULE_NAME "I/O Library"
 #define IO_MODULE_DESC "I/O Library for OpenKernel"
-#define IO_MODULE_VER "1.0"
+#define IO_MODULE_VER "1.1"
 #define IO_MODULE_AUTHOR "OpenSoftware-World"
 #define IO_MODULE_FILE_NAME "io.lib"
-#define IO_MODULE_KRNL_VER "2.0"
+#define IO_MODULE_KRNL_VER "3.0"
 
 #endif
