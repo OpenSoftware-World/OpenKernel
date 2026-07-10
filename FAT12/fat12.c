@@ -58,9 +58,7 @@ void fat12_list_root() {
                 name[k] = entry[j].filename[k];
             }
             name[11] = '\0';
-
-            vga_print_scr(name);
-            vga_print_scr("\n");
+            vga_print_scr_nw(name);
         }
     }
 }
@@ -70,7 +68,6 @@ int fat12_read_file(const char* filename, void* buffer, uint32_t size) {
 
     for (uint32_t i = 0; i < fs.root_dir_size; i++) {
         read_sector(fs.root_dir_lba + i, sector);
-
         fat12_dir_entry_t* entry = (fat12_dir_entry_t*)sector;
 
         for (int j = 0; j < 16; j++) {
@@ -78,22 +75,18 @@ int fat12_read_file(const char* filename, void* buffer, uint32_t size) {
                 return -1;
 
             if (strncmp(entry[j].filename, filename, 11) == 0) {
-
                 uint16_t cluster = entry[j].first_cluster;
                 uint32_t read_bytes = 0;
 
                 while (cluster < FAT12_EOC && read_bytes < size) {
-
                     uint32_t lba = fs.data_start_lba + (cluster - 2) * fs.bs.sectors_per_cluster;
                     read_sector(lba, buffer + read_bytes);
                     read_bytes += fs.bs.sectors_per_cluster * fs.bs.bytes_per_sector;
                     cluster = fat12_get_next_cluster(cluster);
                 }
-
                 return read_bytes;
             }
         }
     }
-
     return -1;
 }

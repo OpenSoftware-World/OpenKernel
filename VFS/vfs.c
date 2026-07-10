@@ -18,15 +18,15 @@ void vfs_init(fs_t fsname) {
             set_fs(OFS);
             break;
         case FAT12:
-            fat12_init();
+            fat12_init(0);
             set_fs(FAT12);
             break;
         case FAT16:
-            fat16_init();
+            fat16_init(0);
             set_fs(FAT16);
             break;
         case FAT32:
-            fat32_init();
+            fat32_init(0);
             set_fs(FAT32);
             break;
     }
