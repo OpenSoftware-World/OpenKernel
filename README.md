@@ -55,7 +55,7 @@ OpenKernel/
 * [x] Memory management
 * [ ] Interrupt handling (IDT)
 * [x] Keyboard driver
-* [x] File system (basic FS)
+* [x] File system (OFS (Open File System))
 
 ---
 
@@ -63,7 +63,7 @@ OpenKernel/
 
 ### Requirements
 
-* `gcc (cross-compiler)`
+* `gcc (cross-compiler / i686-elf-gcc, i686-elf-ld)`
 * `nasm`
 * `qemu`
 
