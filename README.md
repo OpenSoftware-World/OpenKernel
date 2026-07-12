@@ -29,7 +29,7 @@ This project aims to:
 ## 🛠️ Technologies Used
 
 * **Language:** C / x86 Assembly
-* **Compiler:** GCC (i686-elf)
+* **Compiler:** GCC (i686-elf-gcc, i686-elf-ld)
 * **Assembler:** NASM
 * **Emulator:** QEMU / VMware
 
