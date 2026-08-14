@@ -1,5 +1,5 @@
 #include "cpu.h"
-#include <OpenKernel/Drivers/Vga/Vga.h>
+#include <OpenKernel/Drivers/Vga/vga.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreturn-type"

@@ -1,13 +1,12 @@
 #include "keyboard.h"
 #include <OpenKernel/SystemLib/SystemIO/io.h>
+#include <OpenKernel/SystemLib/TimeMng/time.h>
 
 #define KBD_DATA 0x60
 #define KBD_STAT 0x64
 
 static bool_t caps_lock = false;
 static bool_t kbd_enabled_driver = false;
-
-extern void sleep(uint32_t seconds);
 
 static const char kmap[128] __attribute__((section(".rodata"))) = {
     0,  27, '1','2','3','4','5','6','7','8','9','0','-','=', '\b',

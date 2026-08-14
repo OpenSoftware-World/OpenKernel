@@ -1,5 +1,6 @@
 #include "vga.h"
 #include "../../SystemLib/SystemIO/io.h"
+#include "../../SystemLib/Memory/mem.h"
 
 #define SCREEN_SIZE (VWIDTH * VHEIGHT)
 
@@ -220,8 +221,8 @@ void vga_close() {
     cx = 0;
     cy = 0;
     sleep(1);
-    vgabuffer = 0;
-    screen_buffer = 0;
+    memset(vgabuffer, 0, SCREEN_SIZE * sizeof(uint16_t));
+    memset(screen_buffer, 0, sizeof(screen_buffer));
     sleep(1);
     vga_enabled_driver = false;
 }
