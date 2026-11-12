@@ -207,9 +207,9 @@ The struct-based calls (7, 10, 19 to 22, 24 to 28, 32 to 34, 36, 42) do not have
 
 `openkernel_nonuniversal_api_sys_next_status()` appears in `nonuniversal_api_defs.h` but has no implementation in the `.c` file. Any consumer that calls it gets an undefined reference at link time.
 
-### 5.5 The API inherits the `klog_level_t` breakage
+### 5.5 The API previously inherited the `klog_level_t` breakage (resolved)
 
-`openkernel_nonuniversal_api_log_message()` takes a `klog_level_t` parameter. Because `KernelAPI/nonuniversal_api_defs.h` includes `SystemLib/SysCalls/Structs/structs.h`, it gets the correct typedef there. But the moment it is compiled together with `Kernel/KernelServices/LogService/log.h` (which declares `klog_level_t` as a variable), the two definitions collide.
+`openkernel_nonuniversal_api_log_message()` takes a `klog_level_t` parameter. `KernelAPI/nonuniversal_api_defs.h` includes `SystemLib/SysCalls/Structs/structs.h`, which now includes `log.h`, the single owner of the `klog_level_t` typedef. The old collision - `structs.h` typedef-ing the enum while `log.h` declared a *variable* named `klog_level_t` - is gone; both headers agree on one definition.
 
 ## 6. Recommended usage pattern
 

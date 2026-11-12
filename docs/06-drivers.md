@@ -21,7 +21,7 @@ Two rules apply to every driver:
 | Keyboard | `Drivers/Keyboard/` | Partial - polling only, compile errors |
 | Mouse | `Drivers/Mouse/` | Partial - works, but breaks the link |
 | Sound Blaster 16 | `Drivers/Sound/sb16/` | Basic but functional |
-| AHCI | `Drivers/Ahci/` | Substantial, one cast bug and an ordering bug |
+| AHCI | `Drivers/Ahci/` | Compiles clean, reworked, untested on hardware |
 | Serial (COM1) | `Drivers/Serial/` | Logic sound, does not compile |
 | PCI | `Drivers/PCIBus/` | Does not compile |
 | Ethernet layer | `Drivers/Network/Ethernet/` | Skeleton, does not compile |
@@ -220,28 +220,35 @@ Status:
 
 ## 8. AHCI - `Drivers/Ahci/`
 
-The most sophisticated driver in the repository (564 lines). It targets SATA controllers exposing an AHCI ABAR through PCI BAR5.
+The most sophisticated driver in the repository (500 lines). It targets SATA controllers exposing an AHCI ABAR through PCI BAR5.
 
 ```c
 int  ahci_init(void);
 int  ahci_scan_ports(void);
-void ahci_read_sector(int port, uint32_t lba, uint32_t count, uint8_t *buf);
-void ahci_write_sector(int port, uint32_t lba, uint32_t count, const uint8_t *buf);
+int  ahci_read_sector(int port, uint32_t lba, uint32_t count, uint8_t *buf);
+int  ahci_write_sector(int port, uint32_t lba, uint32_t count, const uint8_t *buf);
 int  ahci_get_port_count(void);
 ahci_port_state_t* ahci_get_port(int index);
 void ahci_print_info(void);
 ```
 
-`ahci.h` models the full register set: `CAP`, `GHC`, `IS`, `PI`, `VS`, and the per-port `CLB`, `FB`, `CMD`, `TFD`, `SIG`, `SSTS`, `SCTL`, `SERR`, `SACT`, `CI`, `SNTF`, `FBS`, plus FIS types and a limit of 32 ports and 32 command slots.
+`ahci.h` models the full register set: `CAP`, `GHC`, `CAP2`, `IS`, `PI`, `VS`, and the per-port `CLB`, `FB`, `CMD`, `TFD`, `SIG`, `SSTS`, `SCTL`, `SERR`, `SACT`, `CI`, `SNTF`, `FBS`, plus FIS types and a limit of 32 ports and 32 command slots. `ahci_read_sector()` / `ahci_write_sector()` return `0` on success and `-1` on failure (bad port, timeout, device error).
 
-`ahci_init()` scans PCI for class `01:06:01` (SATA), reads BAR5, masks off the flag bits, and sets `GHC.AE`. `ahci_scan_ports()` iterates the `PI` register, matches the SATA signature `0x00000101`, configures each port, and identifies the drive through words 60 and 61 of the IDENTIFY data.
+`ahci_init()` scans PCI for class `01:06:01` (SATA), reads BAR5 (validating that it is a memory BAR), masks off the flag bits, enables bus mastering and memory decoding in PCI command, and sets `GHC.AE`. `ahci_scan_ports()` iterates the `PI` register, matches the SATA signature `0x00000101`, stops and restarts each port (bounded waits), and only then identifies the drive with a real IDENTIFY (`0xEC`) command issued through the command-slot machinery. IDENTIFY words 60 and 61 select LBA48 versus LBA28; if the device reports no LBA support the port stays unused rather than reporting a bogus sector count.
 
-Known problems:
+Behaviour worth knowing:
 
-- Line 148 assigns `&cmd_tbl->prdt[0]` to an `ahci_prdt_entry_t*` although `prdt` is declared as `uint8_t[128 * 8]`. A cast is missing; this is a compile error on GCC 14 and a warning on earlier versions.
-- **Ordering bug:** `ahci_scan_ports()` issues the IDENTIFY read *before* calling `configure_port()`, so the port has no command list or receive FIS area yet and identification always fails. `total_sectors` ends up as 0.
-- Command lists and FIS buffers are allocated with `kmalloc()`, which aligns only to 4 bytes and never frees. AHCI requires 1 KiB-aligned command lists.
-- Nothing in the repository calls `ahci_init()`.
+- Register layouts and structure sizes are locked with `STATIC_ASSERT` checks on `sizeof` and `__builtin_offsetof`, so the old silent layout drift (16-byte command headers, 30-byte D2H FIS, wrong `reserved` size placing ports at `0x60` instead of `0x100`) cannot come back.
+- Command lists, FIS receive areas, and command tables come from `kmalloc_aligned()` (1 KiB / 256 / 128 byte alignment) built on the project's `kmalloc()` plus the next power-of-two block header trick. They are still never freed.
+- Command header `PRDTL` is set from the actual PRD count (`AHCI_CMD_PRDTL(n)`), and the AHCI spec-required `CFL = 5` is set for every command FIS.
+- Transfers are split on PRD boundaries (8 KiB pieces) and on the 4 MiB LBA48 range boundary; reads stop if the drive raises `TFES` (`SERR.TF` + `SERR.DIAG`), and every wait loop has a bounded timeout that actually fires.
+- The driver's own port/CMD/CI/TD registers are accessed through `volatile` pointers; `prt_dec()` divides a `uint64_t` by a constant, so no `__udivdi3` libgcc dependency is pulled in.
+
+Known limitations:
+
+- **Nothing in the repository calls `ahci_init()`**, and it cannot be linked yet: `ahci_init()` needs `pci_get_device()`, and `Drivers/PCIBus/pci.c` still fails to compile (see section 9).
+- Untested on real hardware or QEMU: the project has no boot code, so verification so far is compile-time only (structure asserts, clean `-Wall -Wextra` build).
+- No interrupts, no hot-plug, no ATAPI devices, no NCQ; everything is polled with busy-wait timeouts.
 
 ## 9. PCI - `Drivers/PCIBus/`
 

@@ -74,7 +74,7 @@ Rough size distribution (C source plus headers, about 5,350 lines total):
 | `KernelAPI/` | 341 | 6% |
 | File systems (`OFS`, `FAT*`, `VFS`) | 596 | 11% |
 
-The largest single files are `Drivers/Ahci/ahci.c` (564 lines) and `Kernel/KernelServices/SecurityChecker/security.c` (522 lines).
+The largest single files are `Kernel/KernelServices/SecurityChecker/security.c` (602 lines) and `Drivers/Ahci/ahci.c` (500 lines).
 
 ## 2. Include convention
 

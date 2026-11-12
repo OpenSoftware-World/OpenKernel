@@ -2,6 +2,8 @@
 #define SYSCALL_EXTERN_H
 
 #include <OpenKernel/SystemLib/Std/types.h>
+/* This header declares log_message(), so it must see klog_level_t. */
+#include <OpenKernel/Kernel/KernelServices/LogService/log.h>
 
 extern void vga_print_scr(const char *str);
 extern void vga_clear_screen(const char *mode);

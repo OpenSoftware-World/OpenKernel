@@ -115,6 +115,11 @@ task_t* task_current() {
     return current;
 }
 
+/* Read-only access to the circular task list head for external checks */
+task_t* task_list_head() {
+    return task_list;
+}
+
 void task_block() {
     if (!current)
         return;

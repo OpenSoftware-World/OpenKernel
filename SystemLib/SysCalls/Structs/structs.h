@@ -2,16 +2,9 @@
 #define STRUCTS_H
 
 #include <OpenKernel/SystemLib/Std/types.h>
-
-enum kernel_log_level {
-    LOG_SUCCESS,
-    LOG_ERROR,
-    LOG_WARNING,
-    LOG_INFO,
-    LOG_UNKNOWN
-};
-
-typedef enum kernel_log_level klog_level_t;
+/* log.h owns the kernel_log_level enum; defining it here as well made
+   the two headers collide in translation units that use both. */
+#include <OpenKernel/Kernel/KernelServices/LogService/log.h>
 
 typedef struct {
     uint8_t x;

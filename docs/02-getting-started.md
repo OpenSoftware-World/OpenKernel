@@ -103,7 +103,7 @@ cp Makefile link.ld notes.txt install_pkg.sh package/
 
 Then run `make` from `package/`.
 
-> Even in Layout B the build does not fully succeed today. Two `C_SRC` paths are wrong regardless of layout, and 16 of 31 C files have compile errors. See [09 - Project Status](09-project-status.md).
+> Even in Layout B the build does not fully succeed today. Two `C_SRC` paths are wrong regardless of layout, and 11 of 31 C files have compile errors. See [09 - Project Status](09-project-status.md).
 
 ## 4. Bootstrapping your own operating system
 

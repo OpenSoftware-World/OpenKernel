@@ -157,7 +157,7 @@ Two workflows run on GitHub:
 
 Important: **neither workflow compiles the code.** CodeQL runs without a build, so it cannot catch compile errors. The release workflow only packages files.
 
-A valuable contribution would be a third workflow that runs the compile check from section 4 on every pull request. That would have caught all 16 failing files automatically.
+A valuable contribution would be a third workflow that runs the compile check from section 4 on every pull request. That would have caught all 11 currently failing files automatically.
 
 ## 6. Release process
 

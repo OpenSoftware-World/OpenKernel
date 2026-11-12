@@ -14,12 +14,14 @@ Test environment: `i686-elf-gcc` 14.2.0, flags `-m32 -ffreestanding -O2 -Wall -W
 
 | Result | Count |
 |---|---:|
-| Pass syntax check | 15 |
-| Fail syntax check | 16 |
+| Pass syntax check | 20 |
+| Fail syntax check | 11 |
 
-Passing: `kernel_func.c`, `mem.c`, `task.c`, `time.c`, `std.c`, `ofs.c`, `sb16.c`, `vga.c`, `cpu.c`, `ata.c`, `universal_api_defs.c`, `nonuniversal_api_defs.c`, `panic.c`, `vmem.c`, `sysmng.c`.
+Passing: `ahci.c`, `ata.c`, `cpu.c`, `fat12.c`, `kernel_func.c`, `log.c`, `mem.c`, `nonuniversal_api_defs.c`, `ofs.c`, `panic.c`, `sb16.c`, `security.c`, `std.c`, `syscall.c`, `sysmng.c`, `task.c`, `time.c`, `universal_api_defs.c`, `vga.c`, `vmem.c`.
 
-Failing: `syscall.c`, `type_conv.c`, `vfs.c`, `fat12.c`, `fat16.c`, `fat32.c`, `ethernet.c`, `e1000.c`, `rtl8139.c`, `ahci.c`, `keyboard.c`, `mouse.c`, `pci.c`, `serial.c`, `log.c`, `security.c`.
+Failing: `keyboard.c`, `mouse.c`, `e1000.c`, `ethernet.c`, `rtl8139.c`, `pci.c`, `serial.c`, `fat16.c`, `fat32.c`, `type_conv.c`, `vfs.c`.
+
+Four files were fixed since the previous revision of this document: `ahci.c`, `log.c`, `security.c`, and `syscall.c`. An earlier revision also listed `fat12.c` as failing; that claim was wrong - `fat12.c` uses `file_name` correctly and has always passed.
 
 Note on the include root: the tests above use `-I ..` because every file includes headers as `<OpenKernel/...>`. Using `-I .` from the repository root makes almost every file fail on missing includes, since the repository root *is* `OpenKernel`.
 
@@ -50,28 +52,15 @@ The second one is a case difference, which fails on Linux and macOS but may pass
 
 `link.ld` declares `ENTRY(_start)`, `ASM_SRC` is empty, and the repository contains **no assembly files at all**. There is no `_start`, no `kernel_main`, no multiboot header. Even a perfect compile would fail at link with `cannot find entry symbol _start`, and GRUB would find no multiboot header to boot.
 
-### Blocker 4 - 16 files do not compile
+### Blocker 4 - 11 files do not compile
 
-Grouped by cause:
-
-**The `klog_level_t` declaration (3 files)**
-
-In `Kernel/KernelServices/LogService/log.h`:
-
-```c
-enum kernel_log_level {
-    LOG_SUCCESS, LOG_ERROR, LOG_WARNING, LOG_INFO, LOG_UNKNOWN
-} klog_level_t;          /* declares a VARIABLE, not a type */
-```
-
-This should be `typedef enum kernel_log_level klog_level_t;`, which is exactly how `SystemLib/SysCalls/Structs/structs.h` does it. The broken form breaks `log.c`, and propagates through `SystemLib/SysCalls/syscall_extern.h` to break `syscall.c` and `security.c`.
+An earlier revision of this document listed 16. Since then the `klog_level_t` declaration in `log.h` was fixed (a duplicate enum in `structs.h` now includes `log.h` instead of redeclaring it), which unblocked `log.c`, `syscall.c`, and `security.c`, and the `ahci.c` cast/layout errors were fixed. What remains, grouped by cause:
 
 **Missing symbols and name mismatches (7 files)**
 
 | File | Problem |
 |---|---|
 | `fat16.c`, `fat32.c` | Call `ata_read_sector()`; the real function is `ata_sys_disk_read()` |
-| `fat12.c` | Uses `entry[j].filename`; the struct member is `file_name` |
 | `pci.c` | Uses `pci_device_t`; the type is `pci_dev_t`. Also references `pci_device_count` instead of `pci_dev_count` |
 | `serial.c` | Defines `serial_read_char()` twice; references `COMR_MCR` instead of `COM1_MCR` |
 | `rtl8139.c` | Uses `RTL_RX_BUFFER_SIZE` and `RTL_REG_COMMAND`; the header defines `RTL_RX_BUF_SIZE` and `RTL_REG_CMD` |
@@ -81,7 +70,7 @@ This should be `typedef enum kernel_log_level klog_level_t;`, which is exactly h
 
 `type_conv.c` has an undeclared identifier `str1` in `itoa()` and a missing semicolon in `htoan()`.
 
-**GCC 14 strictness (4 files)**
+**GCC 14 strictness (3 files)**
 
 These are warnings on GCC 13 and earlier but errors on GCC 14:
 
@@ -89,21 +78,17 @@ These are warnings on GCC 13 and earlier but errors on GCC 14:
 |---|---|
 | `keyboard.c` | `return;` in `to_upper()`, `kb_check()`, and `get_char()`, all of which return values |
 | `mouse.c` | Implicit declaration of `sleep()` (missing include) |
-| `ahci.c` | Assigns `uint8_t*` to `ahci_prdt_entry_t*` without a cast (line 148) |
 | `vfs.c` / `vfs.h` | `uint8_t` and `uint32_t` unknown (no type header included); `fat32_list_dir()` called with no arguments; `fat12_list_root()` used without a declaration |
-
-**Type definition (1 file)**
-
-`security.c` fails on `klog_level_t` via `syscall.h`.
 
 ### Blocker 5 - Problems that appear at link time
 
 Even after fixing compilation:
 
 1. **`multiple definition of 'vgabuffer'`** - `Drivers/Vga/vga.c` defines it, and `Drivers/Mouse/mouse.c` line 13 has `extern uint16_t *vgabuffer = (uint16_t *)0xB8000;`, which is a definition with an initializer, not just a declaration.
-2. **`undefined reference to 'task_list'` and `'current'`** - `security.c` declares them `extern`; `task.c` defines them `static`. There is no non-static definition anywhere.
-3. **`undefined reference to 'ata_read_sector'`** - from `fat16.c` and `fat32.c`.
-4. **`cannot find entry symbol _start`** - no boot code exists.
+2. **`undefined reference to 'ata_read_sector'`** - from `fat16.c` and `fat32.c`.
+3. **`cannot find entry symbol _start`** - no boot code exists.
+
+(The former `undefined reference to 'task_list'` / `'current'` problem is resolved: `security.c` now uses the `task_list_head()` accessor defined in `task.c`.)
 
 ## 3. Feature-by-feature status
 
@@ -134,9 +119,9 @@ Legend: **Works** = functional in isolation once initialised. **Partial** = usab
 |---|---|
 | Keyboard driver | Polling only, no ring buffer (declared but unused), no Shift/Alt/Ctrl, GCC 14 errors, `kbd_init()` never called |
 | Mouse driver | Works when polled, but breaks the link with a duplicate `vgabuffer` symbol; no click handling, no IRQ |
-| AHCI driver | Nearly complete; missing cast on line 148, IDENTIFY issued before port configuration, DMA buffers only 4-byte aligned |
+| AHCI driver | Compiles clean and was reworked (structure asserts, aligned DMA buffers, correct IDENTIFY ordering, bounded timeouts); untested on hardware and cannot link until `pci.c` compiles |
 | Serial driver | Logic is correct for a 16550, but does not compile (redefinition and typo) |
-| Security checker | Well structured but does not compile, would not link, never called, and one check clears the screen |
+| Security checker | Compiles clean, all seven checks are real now (issue log, bounded walks, non-destructive screen probe); never called, untested at runtime |
 | VFS | Three functions, one global file system, no paths or handles, does not compile |
 | FAT12 / FAT16 / FAT32 | Read-only by design, 8.3 names only, none compile |
 | Task manager | Data structures only; no context switch, no timer, no preemption |
@@ -193,18 +178,18 @@ The project README lists a feature checklist. Here is how it compares with the c
 
 Ordered roughly by how much they block other work.
 
-1. **`log.h` enum declaration** - one-line fix, unblocks `log.c`, `syscall.c`, and `security.c`.
-2. **Makefile paths** - either strip the `OpenKernel/` prefix or document that builds must run from the package layout. Fix the `sb16` and `RTL8139` paths.
-3. **Duplicate `vgabuffer`** - remove the initializer from `mouse.c` line 13.
-4. **`ata_read_sector` naming** - either rename the ATA function or fix the two FAT callers.
-5. **`task_list` / `current` linkage** - make them non-static in `task.c` or drop the `extern` usage in `security.c`.
-6. **OFS table pointer arithmetic** - `ofs.file_table + (i * SECTOR_SIZE)` must become `(uint8_t*)ofs.file_table + (i * SECTOR_SIZE)`. This one actively corrupts memory.
-7. **OFS table persistence** - write the table back after every mutation, and either enlarge the reserved area or reduce `OFS_MAX_FILES`.
-8. **`kfree()` no-op** - without it the heap is a consumable resource with a hard ceiling.
-9. **KernelAPI scalar argument convention** - pick one side (dereference in the handler, or pass values from the wrapper) and make it consistent.
-10. **`type_conv.c` syntax errors** - two characters-level fixes.
-11. **`serial.c` redefinition and typo** - unblocks a driver that is already wired into `make run` via `-serial stdio`.
-12. **PCI type name mismatch** - unblocks PCI, which in turn unblocks AHCI and the network drivers.
+1. **Makefile paths** - either strip the `OpenKernel/` prefix or document that builds must run from the package layout. Fix the `sb16` and `RTL8139` paths.
+2. **Duplicate `vgabuffer`** - remove the initializer from `mouse.c` line 13.
+3. **`ata_read_sector` naming** - either rename the ATA function or fix the two FAT callers.
+4. **OFS table pointer arithmetic** - `ofs.file_table + (i * SECTOR_SIZE)` must become `(uint8_t*)ofs.file_table + (i * SECTOR_SIZE)`. This one actively corrupts memory.
+5. **OFS table persistence** - write the table back after every mutation, and either enlarge the reserved area or reduce `OFS_MAX_FILES`.
+6. **`kfree()` no-op** - without it the heap is a consumable resource with a hard ceiling.
+7. **KernelAPI scalar argument convention** - pick one side (dereference in the handler, or pass values from the wrapper) and make it consistent.
+8. **`type_conv.c` syntax errors** - two characters-level fixes.
+9. **`serial.c` redefinition and typo** - unblocks a driver that is already wired into `make run` via `-serial stdio`.
+10. **PCI type name mismatch** - unblocks PCI, which in turn unblocks AHCI and the network drivers.
+
+(Two items were removed because they are fixed: the `log.h` enum declaration, and the `task_list` / `current` linkage.)
 
 ## 6. Recommended starting point
 
@@ -212,18 +197,18 @@ If your goal is to get a bootable image as quickly as possible:
 
 1. Create the package layout described in [02 - Getting Started](02-getting-started.md) section 3.
 2. Write `Boot/boot.asm` with a multiboot header and `_start`, plus `Boot/grub/grub.cfg`.
-3. Fix blockers 1 and 2 in the Makefile, then fix the `log.h` declaration.
+3. Fix blockers 1 and 2 in the Makefile. (The `log.h` declaration has already been fixed and no longer needs attention.)
 4. Write a `kernel_main()` that calls `vga_init()` and prints something.
 5. Build with a subset of `C_SRC` - only the files you actually need (`vga.c`, `cpu.c`, `std.c`, `mem.c`, `io.h`). Do not try to compile everything at once.
 6. Add subsystems incrementally, checking the build after each one.
 
-Trying to fix all 16 failing files before booting anything makes it hard to tell which fix caused which regression.
+Trying to fix all 11 failing files before booting anything makes it hard to tell which fix caused which regression.
 
 ## 7. Confidence notes
 
-- **Verified by running the compiler:** the 15/16 pass-fail split, the Makefile path failure, the absence of assembly files, and the absence of `_start` and `kernel_main`.
-- **Verified by reading the source:** the `klog_level_t` declaration, the duplicate `vgabuffer` definition, the `static` versus `extern` task globals, the missing `ata_read_sector`, the `kfree` no-op, the `0xDEADBEEF` pointer, the OFS pointer arithmetic, and the syscall argument mismatch.
-- **Not verified:** runtime behaviour on real hardware or in QEMU. Nothing in this repository was executed, because nothing in this repository can currently be built or booted.
+- **Verified by running the compiler:** the 20/11 pass-fail split, the Makefile path failure, the absence of assembly files, and the absence of `_start` and `kernel_main`.
+- **Verified by reading the source:** the duplicate `vgabuffer` definition, the missing `ata_read_sector`, the `kfree` no-op, the `0xDEADBEEF` pointer, the OFS pointer arithmetic, and the syscall argument mismatch.
+- **Not verified:** runtime behaviour on real hardware or in QEMU. Nothing in this repository was executed, because nothing in this repository can currently be built or booted. The AHCI and security-checker fixes are compile-verified only.
 
 ---
 

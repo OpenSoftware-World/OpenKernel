@@ -27,6 +27,7 @@ task_t* task_create(void (*entry)(void), uint32_t stack_size);
 void task_destroy(task_t* task);
 void task_add(task_t* task);
 void task_remove(task_t* task);
+task_t* task_list_head();
 void schedule();
 void yield();
 task_t* task_current();
@@ -36,9 +37,9 @@ void task_unblock(task_t* task);
 
 #define TASK_MNG_MODULE_NAME "Task Management Library"
 #define TASK_MNG_MODULE_DESC "Task Management Library for OpenKernel"
-#define TASK_MNG_MODULE_VER "1.0"
+#define TASK_MNG_MODULE_VER "2.0"
 #define TASK_MNG_MODULE_AUTHOR "OpenSoftware-World"
 #define TASK_MNG_MODULE_FILE_NAME "task.lib"
-#define TASK_MNG_MODULE_KRNL_VER "2.0"
+#define TASK_MNG_MODULE_KRNL_VER "3.0"
 
 #endif

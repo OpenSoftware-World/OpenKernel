@@ -58,8 +58,8 @@ log_message(LOG_ERROR, "Disk read failed");
 Requirements and limitations:
 
 - `vga_init()` must have been called.
-- **This module does not compile as written.** In `log.h` the enum declaration ends with `} klog_level_t;`, which declares a global *variable* named `klog_level_t` instead of creating a type alias. The correct form exists in `SystemLib/SysCalls/Structs/structs.h` (`typedef enum kernel_log_level klog_level_t;`). Until the header is fixed, `log.c`, `syscall.c`, and `security.c` all fail to compile. See [09 - Project Status](09-project-status.md).
-- The same symbol breaks `SystemLib/SystemIO/qemu_io.h`.
+- **Compiles cleanly.** The old bug - `log.h` ending the enum with `} klog_level_t;`, which declared a global *variable* instead of a type alias - is fixed: `log.h` now owns `typedef enum kernel_log_level klog_level_t;`, `structs.h` and `syscall_extern.h` include `log.h` instead of redeclaring the enum, and `log.c`, `syscall.c`, and `security.c` all compile again. See [09 - Project Status](09-project-status.md).
+- `SystemLib/SystemIO/qemu_io.h` resolves the type through the same `log.h` include.
 
 ## 3. System management - `Kernel/KernelServices/SystemManagement/sysmng.c`
 
@@ -134,7 +134,7 @@ Flags defined in `vmem.h`:
 
 ## 5. Security checker - `Kernel/KernelServices/SecurityChecker/security.c`
 
-A self-test framework referred to internally as PSC (OpenKernel Security Checker). About 520 lines, the second largest file in the project.
+A self-test framework referred to internally as PSC (OpenKernel Security Checker). 602 lines, the largest file in the project.
 
 ### Types
 
@@ -146,23 +146,31 @@ typedef struct {
     int tasks_validated, stack_overflows, heap_corruptions;
     int syscall_violations, memory_leaks;
 } securchk_result_t;
+
+typedef struct {
+    securchk_severity_t severity;
+    const char* module;
+    const char* message;
+    uint32_t    detail;
+} securchk_issue_t;          /* up to SECURCHK_MAX_ISSUES = 32 entries */
 ```
 
 ### Public functions
 
 | Function | Purpose |
 |---|---|
-| `securchk_init(void)` | Sets an internal initialisation flag. |
-| `securchk_run(securchk_result_t*)` | Resets counters, prints a banner, runs all seven checks, prints a report. |
-| `securchk_check_task_integrity(...)` | Walks the task list and validates `entry`, `stack`, state range, id, and that `esp`/`ebp` fall inside the task stack. |
-| `securchk_check_stack_overflow(...)` | Same range validation for stacks. |
-| `securchk_check_heap_integrity(...)` | Allocates 16 bytes with `kmalloc`, fills with `0xAA`, verifies the contents, frees. |
-| `securchk_check_syscall_bounds(...)` | Asserts `syscall(-1, NULL)` and `syscall(132, NULL)` both return `-1`. |
-| `securchk_check_memory_safety(...)` | Self-tests `memset`, `memcpy`, `memcmp` and warns about stack alignment. |
-| `securchk_check_driver_state(...)` | Clears the screen and resets the colour scheme, then reports OK. |
-| `securchk_check_kernel_structures(...)` | Compile-time style assertions: `PAGE_SIZE == 4096`, `sizeof(void*) == 4`, `sizeof(uint32_t) == 4`. |
+| `securchk_init(void)` | Initialises the issue log. |
+| `securchk_run(securchk_result_t*)` | Auto-initialises, resets counters and the issue log, prints a banner, runs all seven checks, prints a report. |
+| `securchk_check_task_integrity(...)` | Walks the task list (bounded, breaks when it returns to the head) and validates `entry`, `stack`, state range, id, and that a non-zero `esp`/`ebp` falls inside the task stack. |
+| `securchk_check_stack_overflow(...)` | Same range validation for stacks, also bounded. |
+| `securchk_check_heap_integrity(...)` | Verifies the guard magic of the next heap block, checks a `kmalloc`'d block for a 1 GiB address-range sanity, tests that a freed block can be re-claimed, then frees. |
+| `securchk_check_syscall_bounds(...)` | Asserts `syscall(-1, NULL)` and `syscall(SYSCALL_PRINT_TIME + 1, NULL)` both return `-1` (the upper bound is kept in sync with the real syscall table, currently 43). |
+| `securchk_check_memory_safety(...)` | Self-tests `memset`, `memcpy`, `memcmp` (including zero-length cases) and warns about stack alignment. |
+| `securchk_check_driver_state(...)` | Probes the VGA text buffer with a cell write/readback (saving and restoring the original cell), then reports OK. |
+| `securchk_check_kernel_structures(...)` | Static asserts plus linker-symbol sanity: `PAGE_SIZE == 4096`, pointer/integer widths, `__ro_start <= __bss_start <= __stack_start <= __heap_start <= __kernel_end`. |
 | `securchk_print_result(...)` | Formats the counters into a report. |
-| `securchk_log_issue(...)` | Records a single issue with severity, module, message, and detail. |
+| `securchk_log_issue(...)` | Records a single issue with severity, module, message, and detail in a bounded ring (drops the oldest when full). |
+| `securchk_get_issue(i)` / `securchk_get_issue_count(void)` | Read access to the recorded issues. |
 | `securchk_get_overall_status(...)` | Returns an overall verdict derived from the counters. |
 | `securchk_stack_canary_set/check(...)` | Places or verifies the canary value `0xDEADBEEF` at the first and last word of a stack region. |
 
@@ -170,12 +178,11 @@ typedef struct {
 
 - It is a **diagnostic report generator, not a protection mechanism**. It observes state; it does not enforce anything.
 - The stack canary helpers are never called anywhere in the repository.
-- `securchk_check_driver_state()` clears the user's screen as its "check", which is almost certainly not what you want in production.
-- `SECURCHK_MAX_SYSCALLS` is defined as 32, but there are 43 syscall numbers (0 to 42), so the bound is stale.
-- `SECURCHK_HEAP_MAGIC`, `securchk_issue_t`, and the `memory_leaks` counter are declared but never used.
-- **The module does not compile** because it includes `syscall.h`, which pulls in the broken `klog_level_t` declaration.
-- Even if it compiled, it would fail to link: it declares `extern task_t* task_list;` and `extern task_t* current;`, while `SystemLib/TaskMng/task.c` defines both as `static`.
-- Nothing ever calls `securchk_init()` or `securchk_run()`.
+- It now compiles cleanly (`-Wall -Wextra`) and no longer depends on the static `task_list`/`current` symbols: the task walk goes through the `task_list_head()` accessor added to `SystemLib/TaskMng/task.c`.
+- The syscall upper bound is derived from `SYSCALL_PRINT_TIME`, so it cannot silently drift from the real table again.
+- The heap check verifies guard magic, block ranges, and free/re-claim behaviour instead of only "did `kmalloc` return non-NULL".
+- The driver-state check no longer wipes the screen; it touches one VGA cell and restores it.
+- Nothing ever calls `securchk_init()` or `securchk_run()`, and the module is untested at runtime (the project has no boot code).
 
 ## 6. Kernel information - `Kernel/openkernel_information.h`
 
@@ -213,7 +220,7 @@ Rules of thumb:
 
 - Anything that prints requires `vga_init()` first.
 - Anything that allocates requires `heap_init()` first.
-- `log_message()` cannot be used at all until the `klog_level_t` declaration in `log.h` is corrected.
+- `log_message()` is usable: `log.h` now owns the `klog_level_t` typedef (the duplicate enum in `structs.h` was removed in favour of including `log.h`).
 
 ---
 

@@ -13,7 +13,7 @@
 #define AHCI_IS        0x08  /* Interrupt Status */
 #define AHCI_PI        0x0C  /* Ports Implemented */
 #define AHCI_VS        0x10  /* Version */
-#define AHCI_AHCICTL   0x24  /* AHCI Control */
+#define AHCI_CAP2      0x24  /* Capabilities 2 */
 
 #define AHCI_PORT_SIZE 0x80
 #define AHCI_PORT_BASE 0x100
@@ -57,16 +57,28 @@
 #define AHCI_PORT_IS_DHRS (1 << 0)  /* Device to Host Register FIS */
 #define AHCI_PORT_IS_PSS  (1 << 27) /* Set Task Bits */
 
+/* PxTFD bits - the device must be idle before a command is issued */
+#define AHCI_TFD_BSY (1 << 7)  /* Device Busy */
+#define AHCI_TFD_DRQ (1 << 3)  /* Data Request */
+
+/* Device register value for LBA addressing */
+#define AHCI_DEV_LBA  0x40
+
 #define AHCI_SIG_ATA    0x00000101
 #define AHCI_SIG_ATAPI  0xEB140101
 #define AHCI_SIG_PM     0x96690101
 #define AHCI_SIG_SEMB   0xC33C0101
 
-#define AHCI_CMD_CFIS_LEN 0x10  /* 16 DWORDs */
-#define AHCI_CMD_ACMD     0x0040
-#define AHCI_CMD_WRITE    0x0040
-#define AHCI_CMD_PREF     0x0004
-#define AHCI_CMD_CLEAR    0x0001
+/* Command Header DW0 flags (ahci_cmd_hdr_t.dw0) */
+#define AHCI_CMD_CFIS_LEN 0x10  /* Command FIS length: 16 DWORDs */
+#define AHCI_CMD_WRITE    0x0040 /* WRITE bit (host -> device data) */
+#define AHCI_CMD_PREF     0x0080 /* Prefetchable bit */
+#define AHCI_CMD_PRDTL(n) ((uint32_t)(n) << 8) /* PRD entry count */
+
+/* ATA opcodes used by this driver */
+#define AHCI_ATA_READ_DMA_EXT   0x25
+#define AHCI_ATA_WRITE_DMA_EXT  0x35
+#define AHCI_ATA_IDENTIFY_DEVICE 0xEC
 
 /* FIS Types */
 #define FIS_TYPE_REG_H2D  0x27
@@ -99,7 +111,9 @@ typedef volatile struct {
     uint32_t em_ctl;
     uint32_t cap2;
     uint32_t bohc;
-    uint8_t  reserved[0x60];
+    /* 0x2C..0x9F reserved (0x74 bytes), 0xA0..0xFF vendor (0x60 bytes),
+       so the port registers start at the spec address 0x100. */
+    uint8_t  reserved[0x74];
     uint8_t  vendor[0x60];
     uint8_t  ports_data[0x80 * 32];
 } __attribute__((packed)) ahci_hba_mem_t;
@@ -126,18 +140,23 @@ typedef volatile struct {
     uint32_t vendor[4];
 } __attribute__((packed)) ahci_port_t;
 
+/* Command Header: 8 DWORDs (32 bytes) - DW0 flags, DW1/DW2 command
+   table address, DW3 and DW4-DW7 reserved (AHCI spec) */
 typedef struct {
     uint32_t dw0;
     uint32_t desc_base;
     uint32_t desc_base_upper;
     uint32_t rsv0;
+    uint32_t rsv1[4];
 } __attribute__((packed)) ahci_cmd_hdr_t;
 
 typedef struct {
     uint8_t  cfis[64];
     uint8_t  acmd[16];
     uint8_t  rsv0[48];
-    uint8_t  prdt[128 * AHCI_MAX_PRDT];
+    /* PRD entries follow the 128-byte command header area; each entry
+       is 16 bytes (ahci_prdt_entry_t), so 8 entries = 128 bytes. */
+    uint8_t  prdt[16 * AHCI_MAX_PRDT];
 } __attribute__((packed)) ahci_cmd_table_t;
 
 typedef struct {
@@ -171,12 +190,13 @@ typedef struct {
     uint8_t  rsv1[4];
 } __attribute__((packed)) ahci_fis_reg_h2d_t;
 
+/* Register FIS - Device to Host (AHCI spec: 28 bytes) */
 typedef struct {
     uint8_t  fis_type;
     uint8_t  pmport: 4;
-    uint8_t  rsv0: 2;
+    uint8_t  rsv0: 1;
     uint8_t  i: 1;
-    uint8_t  c: 1;
+    uint8_t  rsv1: 2;
     uint8_t  status;
     uint8_t  error;
     uint8_t  lba0;
@@ -186,10 +206,10 @@ typedef struct {
     uint8_t  lba3;
     uint8_t  lba4;
     uint8_t  lba5;
-    uint8_t  rsv1[2];
+    uint8_t  rsv2;
     uint8_t  countl;
     uint8_t  counth;
-    uint8_t  rsv2[10];
+    uint8_t  rsv3[14];
 } __attribute__((packed)) ahci_fis_reg_d2h_t;
 
 /* Port state for driver */
@@ -200,6 +220,7 @@ typedef struct {
     int          present;
     uint64_t     total_sectors;
     uint32_t     sector_size;
+    void*        cmd_list;
     ahci_cmd_table_t* cmd_table;
     void*        rx_fis;
 } ahci_port_state_t;
@@ -207,16 +228,16 @@ typedef struct {
 /* Driver public API */
 int  ahci_init(void);
 int  ahci_scan_ports(void);
-void ahci_read_sector(int port, uint32_t lba, uint32_t count, uint8_t* buf);
-void ahci_write_sector(int port, uint32_t lba, uint32_t count, const uint8_t* buf);
+int  ahci_read_sector(int port, uint32_t lba, uint32_t count, uint8_t* buf);
+int  ahci_write_sector(int port, uint32_t lba, uint32_t count, const uint8_t* buf);
 int  ahci_get_port_count(void);
 ahci_port_state_t* ahci_get_port(int index);
 void ahci_print_info(void);
 
 #define AHCI_DRIVER_NAME "OpenKernel AHCI SATA Driver"
-#define AHCI_DRIVER_VER "1.0"
+#define AHCI_DRIVER_VER "2.0"
 #define AHCI_DRIVER_DESC "AHCI SATA controller driver for OpenKernel"
 #define AHCI_DRIVER_AUTHOR "OpenSoftware-World"
-#define AHCI_DRIVER_KRNL_VER "2.0"
+#define AHCI_DRIVER_KRNL_VER "3.0"
 
 #endif

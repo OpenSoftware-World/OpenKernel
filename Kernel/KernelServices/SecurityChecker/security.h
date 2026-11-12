@@ -4,7 +4,10 @@
 #include <OpenKernel/SystemLib/Std/types.h>
 
 #define SECURCHK_MAX_TASKS       256
-#define SECURCHK_MAX_SYSCALLS    32
+#define SECURCHK_MAX_ISSUES      32
+/* Number of valid syscall ids (0..42). Keep in sync with syscall.h:
+   SYSCALL_PRINT_TIME is the highest valid id. */
+#define SECURCHK_MAX_SYSCALLS    43
 #define SECURCHK_STACK_CANARY    0xDEADBEEF
 #define SECURCHK_HEAP_MAGIC      0xCAFEBABE
 
@@ -37,16 +40,19 @@ typedef struct {
 void securchk_init(void);
 void securchk_run(securchk_result_t* result);
 
-int  securchk_check_task_integrity(securchk_result_t* result);
-int  securchk_check_stack_overflow(securchk_result_t* result);
-int  securchk_check_heap_integrity(securchk_result_t* result);
-int  securchk_check_syscall_bounds(securchk_result_t* result);
-int  securchk_check_memory_safety(securchk_result_t* result);
-int  securchk_check_driver_state(securchk_result_t* result);
-int  securchk_check_kernel_structures(securchk_result_t* result);
+securchk_severity_t securchk_check_task_integrity(securchk_result_t* result);
+securchk_severity_t securchk_check_stack_overflow(securchk_result_t* result);
+securchk_severity_t securchk_check_heap_integrity(securchk_result_t* result);
+securchk_severity_t securchk_check_syscall_bounds(securchk_result_t* result);
+securchk_severity_t securchk_check_memory_safety(securchk_result_t* result);
+securchk_severity_t securchk_check_driver_state(securchk_result_t* result);
+securchk_severity_t securchk_check_kernel_structures(securchk_result_t* result);
 
 void securchk_print_result(securchk_result_t* result);
+/* module/message must stay valid while stored: pass string literals. */
 void securchk_log_issue(securchk_severity_t severity, const char* module, const char* msg, uint32_t detail);
+const securchk_issue_t* securchk_get_issue(uint32_t index);
+uint32_t securchk_get_issue_count(void);
 int  securchk_get_overall_status(securchk_result_t* result);
 
 void securchk_stack_canary_set(uint32_t* stack, uint32_t stack_size);

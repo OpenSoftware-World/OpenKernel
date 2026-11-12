@@ -95,7 +95,7 @@ This is the lowest-level interface in the project. Drivers build on it.
 
 ### `SystemIO/qemu_io.h`
 
-Provides `qemu_print_dbg(char)`, `qemu_str_print_dbg(const char*)`, and `qemu_log_message(...)` using the QEMU debug console at port `0xE9`. Nothing in the repository includes it, and it would not compile today because it includes the broken `log.h`.
+Provides `qemu_print_dbg(char)`, `qemu_str_print_dbg(const char*)`, and `qemu_log_message(...)` using the QEMU debug console at port `0xE9`. Nothing in the repository includes it. It now resolves `klog_level_t` correctly because it includes `log.h`, which owns the typedef.
 
 ## 4. Time - `SystemLib/TimeMng/time.c`
 
@@ -174,7 +174,7 @@ The data structures exist; the mechanism does not.
 - `task_block()` advances `current` but never runs the next task.
 - `task_sleep(uint32_t ms)` calls `sleep(ms)`, but `sleep()` takes **seconds**, so the unit is wrong by a factor of 1000.
 - `task_destroy()` calls `kfree()`, which is a no-op, so stacks leak.
-- `task_list` and `current` are declared `static`, which prevents `SecurityChecker` from linking against them.
+- `task_list` and `current` are declared `static`; `SecurityChecker` reaches the list through the `task_list_head()` accessor added to `task.c`, so the globals stay private.
 - Nothing in the repository calls `taskmng_init()`, `task_create()`, `yield()`, or `schedule()`.
 
 Treat this module as a **skeleton you can build on**, not as working multitasking. Real preemption would require an IDT, a timer IRQ, and assembly context-switch code, none of which exist here.
@@ -269,7 +269,7 @@ The struct-based calls are the reliable half of this interface.
 
 ### Compile status
 
-`syscall.c` does not compile because `syscall_extern.h` uses `klog_level_t` without including the header that typedefs it.
+`syscall.c` compiles cleanly. It previously failed because `syscall_extern.h` used `klog_level_t` without including the header that typedefs it; `syscall_extern.h` now includes `log.h`, which owns the typedef.
 
 ## 9. Module metadata pattern
 
