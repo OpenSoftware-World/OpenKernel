@@ -163,7 +163,7 @@ A valuable contribution would be a third workflow that runs the compile check fr
 
 Releases are driven entirely by `version.txt`.
 
-1. Update `version.txt` with the new version string (currently `3.0`).
+1. Update `version.txt` with the new version string (currently `4.0`).
 2. Push to `main`.
 
 The workflow then:

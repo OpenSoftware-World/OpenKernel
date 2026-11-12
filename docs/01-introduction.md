@@ -10,7 +10,7 @@ OpenKernel is a kernel-level code base for 32-bit x86 machines. It provides the 
 
 It is designed to be **reused**. You do not flash OpenKernel to a disk and boot it as a finished product. Instead, you place it inside your own project, write your own bootloader and entry point, and call its functions from your own kernel code.
 
-Current version: **3.0** (see `version.txt`).
+Current version: **4.0** (see `version.txt`).
 
 ## What OpenKernel is not
 
@@ -72,7 +72,7 @@ Details are in [03 - Architecture](03-architecture.md).
 
 ## Honest summary of the current state
 
-OpenKernel 3.0 contains roughly 5,300 lines of C across 73 source and header files. Several subsystems work well in isolation (VGA output, CPU control, ATA PIO reads, string and port I/O helpers). Others are partial, and some are placeholders that cannot work as written.
+OpenKernel 4.0 contains roughly 5,300 lines of C across 73 source and header files. Several subsystems work well in isolation (VGA output, CPU control, ATA PIO reads, string and port I/O helpers). Others are partial, and some are placeholders that cannot work as written.
 
 As of the current repository state:
 

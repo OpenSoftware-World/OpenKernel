@@ -284,7 +284,7 @@ Most headers end with a block like this:
 #define MEM_MODULE_KRNL_VER "2.0"
 ```
 
-These macros are documentation embedded in code. No logic reads them. Note that some report a kernel version older than the current 3.0, which is informational drift rather than a functional problem.
+These macros are documentation embedded in code. No logic reads them. Note that some report a kernel version older than the current 4.0, which is informational drift rather than a functional problem.
 
 ---
 

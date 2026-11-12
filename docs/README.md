@@ -1,6 +1,6 @@
 # OpenKernel Documentation
 
-OpenKernel is a 32-bit x86 operating system kernel project written in C and intended to be reused as a base layer by your own operating system. This folder contains the full documentation set for OpenKernel version 3.0.
+OpenKernel is a 32-bit x86 operating system kernel project written in C and intended to be reused as a base layer by your own operating system. This folder contains the full documentation set for OpenKernel version 4.0.
 
 Read the documents in the numbered order below. Every document has a "previous" and "next" link at the top and bottom so you can move through the set like pages in a book.
 

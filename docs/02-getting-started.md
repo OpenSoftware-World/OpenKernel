@@ -179,7 +179,7 @@ void kernel_main(void)
     ofs_init();
 
     vga_set_color_scheme(0x00, 0x0A);
-    vga_print_scr_nw("My OS booted on OpenKernel 3.0");
+    vga_print_scr_nw("My OS booted on OpenKernel 4.0");
 }
 ```
 

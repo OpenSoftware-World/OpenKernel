@@ -115,7 +115,7 @@ A trimmed copy of the integer typedefs (`uint8_t`, `uint32_t`, `bool_t`, and so 
 
 ```c
 #define KERNEL_API_NAME "OpenKernel API"
-#define KERNEL_API_VER  "3.0-16593b9"
+#define KERNEL_API_VER  "4.0-960224c"
 #define KERNEL_API_ARCH "x86 (32-bit)"
 #define KERNEL_API_AUTHOR "OpenSoftware-World"
 ```
