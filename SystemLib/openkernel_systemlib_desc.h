@@ -5,14 +5,14 @@
 #include <OpenKernel/SystemLib/KernelFunc/kernel_func.h>
 #include <OpenKernel/SystemLib/Memory/mem.h>
 #include <OpenKernel/SystemLib/Std/std.h>
-#include <OpenKernel/SystemLib/Syscalls/syscall.h>
+#include <OpenKernel/SystemLib/SysCalls/syscall.h>
 #include <OpenKernel/SystemLib/SystemIO/io.h>
 #include <OpenKernel/SystemLib/TaskMng/task.h>
 #include <OpenKernel/SystemLib/TimeMng/time.h>
-#include <OpenKernel/SystemLib/TypeConv/type_conv.h>
+#include <OpenKernel/SystemLib/TypeConversion/type_conv.h>
 
 #define OPENKERNEL_SYSTEMLIB_PKG_NAME "OpenKernel System Libraries"
-#define OPENKERNEL_SYSTEMLIB_PKG_VER "1.0"
+#define OPENKERNEL_SYSTEMLIB_PKG_VER "1.5"
 
 typedef struct {
     const char *module_name;
@@ -23,17 +23,7 @@ typedef struct {
     const char *module_krnl_ver;
 } openkernel_systemlib_module_information_t;
 
-openkernel_systemlib_module_information_t kernel_func_lib;
-openkernel_systemlib_module_information_t memory_lib;
-openkernel_systemlib_module_information_t std_lib;
-openkernel_systemlib_module_information_t types_lib;
-openkernel_systemlib_module_information_t syscalls_lib;
-openkernel_systemlib_module_information_t systemio_lib;
-openkernel_systemlib_module_information_t taskmng_lib;
-openkernel_systemlib_module_information_t timemng_lib;
-openkernel_systemlib_module_information_t type_conv_lib;
-
-kernel_func_lib = (openkernel_systemlib_module_information_t) {
+const openkernel_systemlib_module_information_t kernel_func_lib = {
     .module_name = KERNEL_FUNC_MODULE_NAME,
     .module_desc = KERNEL_FUNC_MODULE_DESC,
     .module_ver = KERNEL_FUNC_MODULE_VER,
@@ -42,7 +32,7 @@ kernel_func_lib = (openkernel_systemlib_module_information_t) {
     .module_krnl_ver = KERNEL_FUNC_MODULE_KRNL_VER,
 };
 
-memory_lib = (openkernel_systemlib_module_information_t) {
+const openkernel_systemlib_module_information_t memory_lib = {
     .module_name = MEM_MODULE_NAME,
     .module_desc = MEM_MODULE_DESC,
     .module_ver = MEM_MODULE_VER,
@@ -51,7 +41,7 @@ memory_lib = (openkernel_systemlib_module_information_t) {
     .module_krnl_ver = MEM_MODULE_KRNL_VER,
 };
 
-std_lib = (openkernel_systemlib_module_information_t) {
+const openkernel_systemlib_module_information_t std_lib = {
     .module_name = STD_MODULE_NAME,
     .module_desc = STD_MODULE_DESC,
     .module_ver = STD_MODULE_VER,
@@ -60,7 +50,7 @@ std_lib = (openkernel_systemlib_module_information_t) {
     .module_krnl_ver = STD_MODULE_KRNL_VER,
 };
 
-types_lib = (openkernel_systemlib_module_information_t) {
+const openkernel_systemlib_module_information_t types_lib = {
     .module_name = TYPES_MODULE_NAME,
     .module_desc = TYPES_MODULE_DESC,
     .module_ver = TYPES_MODULE_VER,
@@ -69,7 +59,7 @@ types_lib = (openkernel_systemlib_module_information_t) {
     .module_krnl_ver = TYPES_MODULE_KRNL_VER,
 };
 
-syscalls_lib = (openkernel_systemlib_module_information_t) {
+const openkernel_systemlib_module_information_t syscalls_lib = {
     .module_name = SYSCALL_MODULE_NAME,
     .module_desc = SYSCALL_MODULE_DESC,
     .module_ver = SYSCALL_MODULE_VER,
@@ -78,7 +68,7 @@ syscalls_lib = (openkernel_systemlib_module_information_t) {
     .module_krnl_ver = SYSCALL_MODULE_KRNL_VER,
 };
 
-systemio_lib = (openkernel_systemlib_module_information_t) {
+const openkernel_systemlib_module_information_t systemio_lib = {
     .module_name = IO_MODULE_NAME,
     .module_desc = IO_MODULE_DESC,
     .module_ver = IO_MODULE_VER,
@@ -87,7 +77,7 @@ systemio_lib = (openkernel_systemlib_module_information_t) {
     .module_krnl_ver = IO_MODULE_KRNL_VER,
 };
 
-taskmng_lib = (openkernel_systemlib_module_information_t) {
+const openkernel_systemlib_module_information_t taskmng_lib = {
     .module_name = TASK_MNG_MODULE_NAME,
     .module_desc = TASK_MNG_MODULE_DESC,
     .module_ver = TASK_MNG_MODULE_VER,
@@ -96,7 +86,7 @@ taskmng_lib = (openkernel_systemlib_module_information_t) {
     .module_krnl_ver = TASK_MNG_MODULE_KRNL_VER,
 };
 
-timemng_lib = (openkernel_systemlib_module_information_t) {
+const openkernel_systemlib_module_information_t timemng_lib = {
     .module_name = TIME_MODULE_NAME,
     .module_desc = TIME_MODULE_DESC,
     .module_ver = TIME_MODULE_VER,
@@ -105,7 +95,7 @@ timemng_lib = (openkernel_systemlib_module_information_t) {
     .module_krnl_ver = TIME_MODULE_KRNL_VER,
 };
 
-type_conv_lib = (openkernel_systemlib_module_information_t) {
+const openkernel_systemlib_module_information_t type_conv_lib = {
     .module_name = TYPE_CONV_MODULE_NAME,
     .module_desc = TYPE_CONV_MODULE_DESC,
     .module_ver = TYPE_CONV_MODULE_VER,
