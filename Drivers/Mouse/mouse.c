@@ -1,6 +1,7 @@
 #include "mouse.h"
 #include <OpenKernel/Drivers/Vga/vga.h>
 #include <OpenKernel/SystemLib/SystemIO/io.h>
+#include <OpenKernel/SystemLib/TimeMng/time.h>
 
 #define VGA_WIDTH 80
 #define VGA_HEIGHT 25

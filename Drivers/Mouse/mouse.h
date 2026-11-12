@@ -19,7 +19,7 @@ void mouse_update();
 void mouse_close();
 
 #define MOUSE_DRIVER_NAME "OpenKernel Mouse Driver"
-#define MOUSE_DRIVER_VER "0.2"
+#define MOUSE_DRIVER_VER "0.3"
 #define MOUSE_DRIVER_DESC "A simple mouse driver for OpenKernel"
 #define MOUSE_DRIVER_AUTHOR "OpenSoftware-World"
 #define MOUSE_DRIVER_KRNL_VER "3.0"
