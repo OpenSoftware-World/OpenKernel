@@ -1,8 +1,8 @@
 #include "vfs.h"
-#include <OpenKernel/FATfs/FAT12/fat12.h>
-#include <OpenKernel/FATfs/FAT16/fat16.h>
-#include <OpenKernel/FATfs/FAT32/fat32.h>
-#include <OpenKernel/OFS/ofs.h>
+#include <OpenKernel/FS/FATfs/FAT12/fat12.h>
+#include <OpenKernel/FS/FATfs/FAT16/fat16.h>
+#include <OpenKernel/FS/FATfs/FAT32/fat32.h>
+#include <OpenKernel/FS/OFS/ofs.h>
 
 fs_t current_fs;
 

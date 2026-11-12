@@ -29,7 +29,7 @@ LDFLAGS = -m elf_i386 -T link.ld
 ASM_SRC = # Bootloader and assembly files (You must specify the file paths.)
 C_SRC = OpenKernel/Drivers/Vga/vga.c \
 	    OpenKernel/Drivers/Cpu/cpu.c \
-		OpenKernel/OFS/ofs.c \
+		OpenKernel/FS/OFS/ofs.c \
 		OpenKernel/Drivers/Ahci/ahci.c \
 		OpenKernel/Drivers/Ata/ata.c \
 		OpenKernel/SystemLib/Memory/mem.c \
@@ -42,9 +42,9 @@ C_SRC = OpenKernel/Drivers/Vga/vga.c \
 		OpenKernel/Drivers/Sound/sb16.c \
 		OpenKernel/Drivers/Keyboard/keyboard.c \
 		OpenKernel/Drivers/Serial/serial.c \
-		OpenKernel/FATfs/FAT12/fat12.c \
-		OpenKernel/FATfs/FAT16/fat16.c \
-		OpenKernel/FATfs/FAT32/fat32.c \
+		OpenKernel/FS/FATfs/FAT12/fat12.c \
+		OpenKernel/FS/FATfs/FAT16/fat16.c \
+		OpenKernel/FS/FATfs/FAT32/fat32.c \
 		OpenKernel/VFS/vfs.c \
 		OpenKernel/Drivers/PCIBus/pci.c \
 		OpenKernel/Drivers/Network/Ethernet/ethernet.c \

@@ -2,7 +2,7 @@
 #include <OpenKernel/Drivers/Ata/ata.h>
 #include <OpenKernel/SystemLib/Std/std.h>
 #include <OpenKernel/Drivers/Vga/vga.h>
-#include <OpenKernel/FATfs/FATLib/fatlib.h>
+#include <OpenKernel/FS/FATfs/FATLib/fatlib.h>
 
 static fat12_fs_t fs;
 
