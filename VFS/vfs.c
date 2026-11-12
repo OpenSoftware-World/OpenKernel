@@ -1,7 +1,7 @@
 #include "vfs.h"
-#include <OpenKernel/FAT12/fat12.h>
-#include <OpenKernel/FAT16/fat16.h>
-#include <OpenKernel/FAT32/fat32.h>
+#include <OpenKernel/FATfs/FAT12/fat12.h>
+#include <OpenKernel/FATfs/FAT16/fat16.h>
+#include <OpenKernel/FATfs/FAT32/fat32.h>
 #include <OpenKernel/OFS/ofs.h>
 
 fs_t current_fs;
@@ -45,7 +45,7 @@ void vfs_list() {
             fat16_list_root();
             break;
         case FAT32:
-            fat32_list_dir();
+            fat32_list_root();
             break;
     }
 }
@@ -64,6 +64,60 @@ void vfs_read_file(const char* name, uint8_t* buffer, void* buf, uint32_t size) 
             break;
         case FAT32:
             fat32_read_file(name, buf, size);
+            break;
+    }
+}
+
+void vfs_create_file(const char *name, uint32_t size) {
+    switch (current_fs) {
+        case OFS:
+        default:
+            ofs_create_file(name, size);
+            break;
+        case FAT12:
+            // The ability to create files on a FAT12 drive is not currently available, but I plan to add it in the future.
+            break;
+        case FAT16:
+            // The ability to create files on a FAT16 drive is not currently available, but I plan to add it in the future.
+            break;
+        case FAT32:
+            // The ability to create files on a FAT32 drive is not currently available, but I plan to add it in the future.
+            break;
+    }
+}
+
+void vfs_write_file(const char *name, const uint8_t* data, uint32_t size) {
+    switch (current_fs) {
+        case OFS:
+        default:
+            ofs_write_file(name, data, size);
+            break;
+        case FAT12:
+            // The ability to write files on a FAT12 drive is not currently available, but I plan to add it in the future.
+            break;
+        case FAT16:
+            // The ability to write files on a FAT16 drive is not currently available, but I plan to add it in the future.
+            break;
+        case FAT32:
+            // The ability to write files on a FAT32 drive is not currently available, but I plan to add it in the future.
+            break;
+    }
+}
+
+void vfs_delete_file(const char *fname) {
+    switch (current_fs) {
+        case OFS:
+        default:
+            ofs_delete_file(fname);
+            break;
+        case FAT12:
+            // The ability to delete files on a FAT12 drive is not currently available, but I plan to add it in the future.
+            break;
+        case FAT16:
+            // The ability to delete files on a FAT16 drive is not currently available, but I plan to add it in the future.
+            break;
+        case FAT32:
+            // The ability to delete files on a FAT32 drive is not currently available, but I plan to add it in the future.
             break;
     }
 }

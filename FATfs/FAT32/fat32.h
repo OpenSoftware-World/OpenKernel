@@ -47,5 +47,6 @@ void fat32_init(uint32_t boot_lba);
 uint32_t fat32_get_next_cluster(uint32_t cluster);
 int fat32_read_file(const char* filename, void* buffer, uint32_t size);
 void fat32_list_dir(uint32_t cluster);
+void fat32_list_root(void);
 
 #endif

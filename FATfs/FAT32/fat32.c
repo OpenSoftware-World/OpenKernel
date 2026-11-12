@@ -105,3 +105,7 @@ int fat32_read_file(const char* filename, void* buffer, uint32_t size) {
     }
     return -1;
 }
+
+void fat32_list_root(void) {
+    fat32_list_dir(fs.root_cluster);
+}
