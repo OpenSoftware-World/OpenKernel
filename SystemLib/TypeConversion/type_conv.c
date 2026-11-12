@@ -8,7 +8,6 @@ char* itoa(int val, char* str) {
 
     if (val == 0) {
         str[0] = '0';
-        str1[1] = '\0';
         return str;
     }
     if (val < 0) {
@@ -49,7 +48,7 @@ char* htoa(uint32_t val, char* str) {
             *ptr++ = digit + '0';
         }
         else {
-            *ptr++ = digit - 10 + 'A'
+            *ptr++ = digit - 10 + 'A';
         }
         val /= 16;
     }
