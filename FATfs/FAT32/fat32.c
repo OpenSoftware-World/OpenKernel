@@ -2,6 +2,7 @@
 #include <OpenKernel/Drivers/Ata/ata.h>
 #include <OpenKernel/SystemLib/Std/std.h>
 #include <OpenKernel/Drivers/Vga/vga.h>
+#include <OpenKernel/FATfs/FATLib/fatlib.h>
 
 static fat32_fs_t fs;
 
@@ -38,23 +39,23 @@ void fat32_list_dir(uint32_t cluster) {
 
         for (uint8_t i = 0; i < fs.bs.sectors_per_cluster; i++) {
             read_sector(lba + i, sector);
-            fat32_dir_entry_t* entry = (fat32_dir_entry_t*)sector;
+            fatfs_dir_entry_t* entry = (fatfs_dir_entry_t*)sector;
 
             for (int j = 0; j < 16; j++) {
-                if (entry[j].filename[0] == 0x00)
+                if (entry[j].file_name[0] == 0x00)
                     return;
 
-                if ((uint8_t)entry[j].filename[0] == 0xE5)
+                if ((uint8_t)entry[j].file_name[0] == 0xE5)
                     continue;
 
                 char name[12];
                 int k = 0;
 
                 for (int x = 0; x < 11; x++) {
-                    if (entry[j].filename[x] == ' ')
+                    if (entry[j].file_name[x] == ' ')
                         continue;
 
-                    name[k++] = entry[j].filename[x];
+                    name[k++] = entry[j].file_name[x];
                 }
 
                 name[k] = '\0';
@@ -80,13 +81,13 @@ int fat32_read_file(const char* filename, void* buffer, uint32_t size) {
 
         for (uint8_t i = 0; i < fs.bs.sectors_per_cluster; i++) {
             read_sector(lba + i, sector);
-            fat32_dir_entry_t* entry = (fat32_dir_entry_t*)sector;
+            fatfs_dir_entry_t* entry = (fatfs_dir_entry_t*)sector;
 
             for (int j = 0; j < 16; j++) {
-                if (entry[j].filename[0] == 0x00)
+                if (entry[j].file_name[0] == 0x00)
                     return -1;
 
-                if (strncmp(entry[j].filename, filename, 11) == 0) {
+                if (strncmp(entry[j].file_name, filename, 11) == 0) {
                     uint32_t file_cluster = ((uint32_t)entry[j].first_cluster_high << 16) | entry[j].first_cluster_low;
                     uint32_t offset = 0;
 

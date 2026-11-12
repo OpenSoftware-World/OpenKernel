@@ -7,21 +7,6 @@
 #define FAT12_BAD_CLUSER 0x0FF7
 
 typedef struct {
-    char file_name[11];
-    uint8_t attr;
-    uint8_t reserved;
-    uint8_t creation_time_tenths;
-    uint16_t creation_time;
-    uint16_t creation_date;
-    uint16_t last_access_date;
-    uint16_t first_cluster_high;
-    uint16_t write_time;
-    uint16_t write_date;
-    uint16_t first_cluster;
-    uint32_t file_size;
-} __attribute__((packed)) fat12_dir_entry_t;
-
-typedef struct {
     uint8_t jmp[3];
     char oem[8];
 

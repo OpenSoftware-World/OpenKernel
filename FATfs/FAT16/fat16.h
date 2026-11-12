@@ -6,21 +6,6 @@
 #define FAT16_EOC 0xFFF8
 #define FAT16_BAD_CLUSTER 0xFFF7
 
-typedef struct {
-    char filename[11];
-    uint8_t attr;
-    uint8_t reserved;
-    uint8_t creation_time_tenths;
-    uint16_t creation_time;
-    uint16_t creation_date;
-    uint16_t last_access_date;
-    uint16_t first_cluster_high;
-    uint16_t write_time;
-    uint16_t write_date;
-    uint16_t first_cluster;
-    uint32_t file_size;
-} __attribute__((packed)) fat16_dir_entry_t;
-
 /* Boot sector */
 typedef struct {
     uint8_t jmp[3];

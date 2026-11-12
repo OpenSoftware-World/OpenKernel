@@ -2,6 +2,7 @@
 #include <OpenKernel/Drivers/Ata/ata.h>
 #include <OpenKernel/SystemLib/Std/std.h>
 #include <OpenKernel/Drivers/Vga/vga.h>
+#include <OpenKernel/FATfs/FATLib/fatlib.h>
 
 static fat16_fs_t fs;
 
@@ -31,20 +32,20 @@ void fat16_list_root() {
 
     for (uint32_t i = 0; i < fs.root_dir_sectors; i++) {
         read_sector(fs.root_dir_lba + i, sector);
-        fat16_dir_entry_t* entry = (fat16_dir_entry_t*)sector;
+        fatfs_dir_entry_t* entry = (fatfs_dir_entry_t*)sector;
 
         for (int j = 0; j < 16; j++) {
-            if (entry[j].filename[0] == 0x00)
+            if (entry[j].file_name[0] == 0x00)
                 return;
 
-            if ((uint8_t)entry[j].filename[0] == 0xE5)
+            if ((uint8_t)entry[j].file_name[0] == 0xE5)
                 continue;
             char name[12];
             int k = 0;
             for (int i = 0; i < 11; i++) {
-                if (entry[j].filename[i] == ' ')
+                if (entry[j].file_name[i] == ' ')
                     continue;
-                name[k++] = entry[j].filename[i];
+                name[k++] = entry[j].file_name[i];
             }
             name[k] = '\0';
             vga_print_scr_nw(name);
@@ -56,14 +57,14 @@ int fat16_read_file(const char* filename, void* buffer, uint32_t size) {
     uint8_t sector[512];
     for (uint32_t i = 0; i < fs.root_dir_sectors; i++) {
         read_sector(fs.root_dir_lba + i, sector);
-        fat16_dir_entry_t* entry = (fat16_dir_entry_t*)sector;
+        fatfs_dir_entry_t* entry = (fatfs_dir_entry_t*)sector;
 
         for (int j = 0; j < 16; j++) {
-            if (entry[j].filename[0] == 0x00)
+            if (entry[j].file_name[0] == 0x00)
                 return -1;
 
-            if (strncmp(entry[j].filename, filename, 11) == 0) {
-                uint16_t cluster = entry[j].first_cluster;
+            if (strncmp(entry[j].file_name, filename, 11) == 0) {
+                uint16_t cluster = entry[j].first_cluster_low;
                 uint32_t offset = 0;
 
                 while (cluster < FAT16_EOC && offset < size) {

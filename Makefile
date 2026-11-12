@@ -42,9 +42,9 @@ C_SRC = OpenKernel/Drivers/Vga/vga.c \
 		OpenKernel/Drivers/Sound/sb16.c \
 		OpenKernel/Drivers/Keyboard/keyboard.c \
 		OpenKernel/Drivers/Serial/serial.c \
-		OpenKernel/FAT12/fat12.c \
-		OpenKernel/FAT16/fat16.c \
-		OpenKernel/FAT32/fat32.c \
+		OpenKernel/FATfs/FAT12/fat12.c \
+		OpenKernel/FATfs/FAT16/fat16.c \
+		OpenKernel/FATfs/FAT32/fat32.c \
 		OpenKernel/VFS/vfs.c \
 		OpenKernel/Drivers/PCIBus/pci.c \
 		OpenKernel/Drivers/Network/Ethernet/ethernet.c \
