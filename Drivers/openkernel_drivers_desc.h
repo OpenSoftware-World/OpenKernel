@@ -1,7 +1,6 @@
 #ifndef OPENKERNEL_DRIVERS_DESC_H
 #define OPENKERNEL_DRIVERS_DESC_H
 
-#include <OpenKernel/SystemLib/Std/types.h>
 #include <OpenKernel/Drivers/Ata/ata.h>
 #include <OpenKernel/Drivers/Cpu/cpu.h>
 #include <OpenKernel/Drivers/PIT/pit.h>

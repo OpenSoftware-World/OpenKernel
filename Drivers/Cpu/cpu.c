@@ -1,5 +1,6 @@
 #include "cpu.h"
 #include <OpenKernel/Drivers/Vga/vga.h>
+#include <OpenKernel/SystemLib/Std/std.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreturn-type"
@@ -11,7 +12,7 @@ uint32_t cpuinfo_data(uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx
 #pragma GCC diagnostic pop
 
 void get_sys_cpuinfo(const char *mode) {
-    if (mode[0] == 'B') {
+    if (mode[0] == 'B' || strcmp(mode, "Brand") == 0 || strcmp(mode, "BRAND") == 0) {
         sys_cpuinfo_t cpuinfo;
         uint32_t *p = (uint32_t*)cpuinfo.sys_cpu_brand;
         
@@ -22,7 +23,7 @@ void get_sys_cpuinfo(const char *mode) {
         vga_print_scr("CPU Brand: ");
         vga_print_scr_nw(cpuinfo.sys_cpu_brand);
     }
-    else if (mode[0] == 'V') {
+    else if (mode[0] == 'V' || strcmp(mode, "Vendor") == 0 || strcmp(mode, "VENDOR") == 0) {
         sys_cpuinfo_t cpuinfo;
         uint32_t *p = (uint32_t*)cpuinfo.sys_cpu_vendor;
         uint32_t regs[4];
@@ -37,10 +38,10 @@ void get_sys_cpuinfo(const char *mode) {
 }
 
 void cpu_status(const char *mode) {
-    if (mode[0] == 'S') {
+    if (mode[0] == 'S' || strcmp(mode, "Sleep") == 0 || strcmp(mode, "SLEEP") == 0) {
         hlt();
     }
-    if (mode[0] == 'A') {
+    if (mode[0] == 'A' || strcmp(mode, "Active") == 0 || strcmp(mode, "ACTIVE") == 0) {
         sti();
     }
 }

@@ -1,5 +1,5 @@
 #include "ethernet.h"
-#include <OpenKernel/SystemLib/Mem/mem.h>
+#include <OpenKernel/SystemLib/Memory/mem.h>
 
 static net_device_t *device_list = 0;
 

@@ -26,7 +26,7 @@ void ethernet_register_device(net_device_t *dev);
 void ethernet_send(uint8_t *dest_mac, uint16_t ethertype, void *payload, uint16_t len);
 
 #define ETHERNET_DRIVER_NAME "OpenKernel Ethernet Driver"
-#define ETHERNET_DRIVER_VER "0.1"
+#define ETHERNET_DRIVER_VER "0.2"
 #define ETHERNET_DRIVER_DESC "A Ethernet driver for OpenKernel"
 #define ETHERNET_DRIVER_AUTHOR "OpenSoftware-World"
 #define ETHERNET_DRIVER_KRNL_VER "2.0"

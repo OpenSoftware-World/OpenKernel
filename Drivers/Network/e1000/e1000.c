@@ -1,5 +1,5 @@
 #include "e1000.h"
-#include <OpenKernel/SystemLib/Mem/mem.h>
+#include <OpenKernel/SystemLib/Memory/mem.h>
 
 #define REG(offset) (*(volatile uint32_t*)((uint8_t*)dev->mmio_base + (offset)))
 
@@ -11,7 +11,7 @@ static e1000_rx_desc_t *rx_ring;
 static uint8_t tx_index = 0;
 static uint8_t rx_index = 0;
 
-bool e1000_init()
+bool_t e1000_init()
 {
     dev = (e1000_t*)kmalloc(sizeof(e1000_t));
 

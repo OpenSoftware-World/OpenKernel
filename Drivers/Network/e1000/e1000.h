@@ -60,7 +60,7 @@ bool_t e1000_init();
 void e1000_send_packet(void *data, uint16_t len);
 
 #define E1000_DRIVER_NAME "OpenKernel Intel E1000 Driver"
-#define E1000_DRIVER_VER "0.1"
+#define E1000_DRIVER_VER "0.2"
 #define E1000_DRIVER_DESC "A Intel E1000 for OpenKernel"
 #define E1000_DRIVER_AUTHOR "OpenSoftware-World"
 #define E1000_DRIVER_KRNL_VER "2.0"

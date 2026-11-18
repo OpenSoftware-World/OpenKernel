@@ -1,5 +1,4 @@
 #include "ahci.h"
-
 #include <OpenKernel/Drivers/Vga/vga.h>
 #include <OpenKernel/SystemLib/Memory/mem.h>
 

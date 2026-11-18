@@ -118,5 +118,5 @@ void serial_loopback_test() {
     else {
         serial_success("Loopback test OK.");
     }
-    outb(COMR_MCR, 0x0);
+    outb(COM1_MCR, 0x0);
 }

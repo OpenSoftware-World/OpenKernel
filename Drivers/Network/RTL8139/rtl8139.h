@@ -31,7 +31,7 @@ bool_t rtl8139_init();
 void rtl8139_send_packet(void *data, uint16_t len);
 
 #define RTL8139_DRIVER_NAME "OpenKernel Realtek 8139 Driver"
-#define RTL8139_DRIVER_VER "0.1"
+#define RTL8139_DRIVER_VER "0.2"
 #define RTL8139_DRIVER_DESC "A Realtek 8139 driver for OpenKernel"
 #define RTL8139_DRIVER_AUTHOR "OpenSoftware-World"
 #define RTL8139_DRIVER_KRNL_VER "2.0"
