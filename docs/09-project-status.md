@@ -146,7 +146,7 @@ Legend: **Works** = functional in isolation once initialised. **Partial** = usab
 
 - Bootloader, `_start`, multiboot header, `kernel_main`
 - GDT or APIC programming (the IDT, 8259A PIC remap and exception/IRQ dispatch now live in `Kernel/Components/InterruptServices/`)
-- A PIT/APIC timer driver - IRQ0 can be delivered through the PIC, but nothing programs a timer
+- A PIC timer driver - IRQ0 is now programmed by the PIT driver (`Drivers/PIT/`), but there is no APIC and no per-CPU timer
 - Real preemptive multitasking or a context switch
 - A userspace syscall gate (`int 0x80`, `sysenter`, ring transitions)
 - `printf` or any varargs formatting

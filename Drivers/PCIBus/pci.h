@@ -27,7 +27,7 @@ int pci_get_dev_count();
 pci_dev_t* pci_get_device(int index);
 
 #define PCIBUS_DRIVER_NAME "OpenKernel PCI Bus Driver"
-#define PCIBUS_DRIVER_VER "0.1"
+#define PCIBUS_DRIVER_VER "0.2"
 #define PCIBUS_DRIVER_DESC "A PCI Bus driver for OpenKernel"
 #define PCIBUS_DRIVER_AUTHOR "OpenSoftware-World"
 #define PCIBUS_DRIVER_KRNL_VER "2.0"

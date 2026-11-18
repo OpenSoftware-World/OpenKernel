@@ -29,6 +29,7 @@ LDFLAGS = -m elf_i386 -T link.ld
 ASM_SRC = OpenKernel/Kernel/Components/InterruptServices/isr.asm
 C_SRC = OpenKernel/Drivers/Vga/vga.c \
 	    OpenKernel/Drivers/Cpu/cpu.c \
+		OpenKernel/Drivers/PIT/pit.c \
 		OpenKernel/FS/OFS/ofs.c \
 		OpenKernel/Drivers/Ahci/ahci.c \
 		OpenKernel/Drivers/Ata/ata.c \

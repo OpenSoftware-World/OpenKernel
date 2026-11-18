@@ -9,7 +9,7 @@
 Two rules apply to every driver:
 
 1. **You must call the `*_init()` function first.** Most drivers keep an "enabled" flag and silently do nothing until initialisation.
-2. **Almost everything is polled, not interrupt driven.** An IDT, PIC remap and dispatcher now exist in `Kernel/Components/InterruptServices/`, but no driver registers an IRQ handler yet - every driver still polls.
+2. **Almost everything is polled, not interrupt driven.** An IDT, PIC remap and dispatcher exist in `Kernel/Components/InterruptServices/`, and the PIT driver is the only one that registers an IRQ handler (IRQ0) - every other driver still polls.
 
 ## Driver status overview
 
@@ -17,6 +17,7 @@ Two rules apply to every driver:
 |---|---|---|
 | VGA text mode | `Drivers/Vga/` | Works |
 | CPU control | `Drivers/Cpu/` | Works (partial feature detection) |
+| PIT (8253/8254) | `Drivers/PIT/` | Compiles clean, registers IRQ0, untested on hardware |
 | ATA (PIO) | `Drivers/Ata/` | Works |
 | Keyboard | `Drivers/Keyboard/` | Partial - polling only, compile errors |
 | Mouse | `Drivers/Mouse/` | Partial - works, but breaks the link |
@@ -322,6 +323,35 @@ outb(nic->io_base + RTL_REG_COMMAND, RTL_CMD_RESET);
 ```
 
 It dereferences a deliberately invalid pointer instead of a PCI BAR, so it would fault immediately. It also uses `RTL_RX_BUFFER_SIZE` and `RTL_REG_COMMAND`, which do not exist (the header defines `RTL_RX_BUF_SIZE` and `RTL_REG_CMD`). The receive functions compute a length and discard it.
+
+## 11. PIT - `Drivers/PIT/`
+
+Intel 8253/8254 Programmable Interval Timer. The first driver in the project that uses interrupts instead of polling: it programs channel 0, hooks IRQ0 (vector 32) through `interrupt_register_handler()` and unmasks the line with `pic_clear_mask(0)`.
+
+```c
+void     pit_init(uint32_t hz);       /* 1000 = 1 kHz, one tick per ms */
+void     pit_stop(void);              /* mask IRQ0, the counter freezes */
+uint32_t pit_get_ticks(void);         /* ticks since the last pit_init() */
+uint32_t pit_get_frequency(void);     /* actual rate: 1193182 / divisor */
+uint32_t pit_get_uptime_ms(void);     /* wraps after about 49.7 days */
+void     pit_sleep_ms(uint32_t ms);   /* busy-wait driven by the ticks */
+```
+
+### Behaviour worth knowing
+
+- **`pit_init()` requires `interrupt_init()` first**, otherwise the handler is registered into an IDT that has not been loaded.
+- **Interrupts must be enabled (`sti`) or the counter never advances.** The driver deliberately does not touch IF - that stays the kernel's decision.
+- The requested rate is clamped to `19 .. 1193182` Hz. At the default 1000 Hz the divisor is `1193`, so the real rate is `1193182 / 1193 = 1000.15` Hz. `pit_get_frequency()` reports the nearest whole hertz (1000), but the millisecond accumulator works from the exact divisor, so the uptime does not drift by the missing 0.15 Hz.
+- Channel 0 is loaded with command word `0x34` (channel 0, low/high byte access, **mode 2 rate generator**, binary counting). `interrupt_dispatch()` sends the EOI, so the handler never writes to the PIC itself.
+- `pit_init()` can be called again with a different rate: the ticks counted at the old rate are folded into the millisecond base first, so `pit_get_uptime_ms()` stays correct.
+- `pit_sleep_ms()` waits with `hlt` while IF is set and spins when it is clear, because `hlt` with IF clear would hang until an NMI. It must not be called from an IRQ handler - the ticks it waits for could not be delivered.
+
+### Limitations
+
+- Ticks stop entirely while IF is clear or after `pit_stop()`, so there is no wall-clock guarantee during `cli` sections.
+- Channel 0 only; channels 1 and 2 (PC speaker, DRAM refresh) are left untouched.
+- No calibration against the RTC, so the crystal error is accepted as is.
+- `pit_get_uptime_ms()` returns `uint32_t` and wraps after roughly 49.7 days.
 
 ---
 

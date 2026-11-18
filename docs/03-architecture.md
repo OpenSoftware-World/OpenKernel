@@ -35,6 +35,7 @@ OpenKernel/
 ├── Drivers/                         Hardware drivers
 │   ├── Vga/                         Text mode 80x25
 │   ├── Cpu/                         CPUID, cli/sti/hlt
+│   ├── PIT/                         8253/8254 interval timer, 1 kHz IRQ0
 │   ├── Keyboard/                    PS/2 polling
 │   ├── Mouse/                       PS/2 polling
 │   ├── Serial/                      COM1 16550

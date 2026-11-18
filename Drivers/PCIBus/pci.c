@@ -3,7 +3,7 @@
 
 #define MAX_PCI_DEV 64
 
-static pci_device_t pci_devs[MAX_PCI_DEV];
+static pci_dev_t pci_devs[MAX_PCI_DEV];
 static int pci_dev_count = 0;
 
 uint32_t pci_read(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset) {
@@ -33,7 +33,7 @@ void pci_scan() {
             if (vendor == 0xFFFF) {
                 continue;
             }
-            pci_device_t dev;
+            pci_dev_t dev;
             dev.bus = bus;
             dev.dev = device;
             dev.func = 0;
@@ -53,16 +53,16 @@ void pci_scan() {
 }
 
 void pci_init() {
-    pci_device_count = 0;
+    pci_dev_count = 0;
     pci_scan();
 }
 
 int pci_get_dev_count() {
-    return pci_device_count;
+    return pci_dev_count;
 }
 
-pci_device_t* pci_get_device(int index) {
-    if (index < 0 || index >= pci_device_count) {
+pci_dev_t* pci_get_device(int index) {
+    if (index < 0 || index >= pci_dev_count) {
         return 0;
     } 
     return &pci_devs[index];
