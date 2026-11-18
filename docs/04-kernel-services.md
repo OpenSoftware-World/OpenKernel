@@ -128,7 +128,7 @@ Flags defined in `vmem.h`:
 
 - It maps only 1 of the 1024 possible page directory entries, so only 4 MiB of the address space is valid. Access beyond that faults.
 - `PAGE_USER` is never applied to any entry; there is no user/supervisor distinction.
-- There is no page fault handler, because there is no IDT to attach one to.
+- There is no page fault handler yet. An IDT now exists (section 6), so one could be attached with `interrupt_register_handler(14, ...)`; until that happens a fault panics the kernel through the default dispatch path.
 - There is no map/unmap function for dynamic allocation, no higher-half layout, and no TLB management.
 - **Nothing in the repository calls `paging_init()`.** Enabling paging is entirely up to your entry point, and you should only do so once you have a fault handler or you are certain all your accesses fall in the mapped range.
 
@@ -184,7 +184,44 @@ typedef struct {
 - The driver-state check no longer wipes the screen; it touches one VGA cell and restores it.
 - Nothing ever calls `securchk_init()` or `securchk_run()`, and the module is untested at runtime (the project has no boot code).
 
-## 6. Kernel information - `Kernel/openkernel_information.h`
+## 6. Interrupt service - `Kernel/Components/InterruptServices/`
+
+The first interrupt-handling code in the project: two C modules plus the NASM entry stubs, all listed in the Makefile (`ASM_SRC` / `C_SRC`).
+
+| File | Purpose |
+|---|---|
+| `interrupt.c` / `interrupt.h` | IDT construction, handler registry and the C dispatch path |
+| `pic.c` / `pic.h` | 8259A initialisation (remap to vectors 32-47), masking and EOI |
+| `isr.asm` | Entry stubs for the 32 exception vectors and 16 IRQ vectors (generated with `%rep`) plus the shared `isr_common` tail |
+
+### Public functions
+
+| Function | Purpose |
+|---|---|
+| `interrupt_init(void)` | Installs gates 0-47, runs `pic_init()` and loads the IDTR with `lidt`. IRQ lines stay masked afterwards. |
+| `interrupt_register_handler(vector, handler)` | Attaches a C handler to an exception (0-31) or IRQ vector (32-47). |
+| `interrupt_dispatch(registers_t*)` | Called from `isr.asm`. Exceptions go to their handler or `kernel_panic()`; IRQ handlers run first, then the EOI is sent either way. |
+| `pic_init(void)` | ICW1-ICW4 sequence: IRQ0-15 map to vectors 32-47, then every line is masked. |
+| `pic_set_mask(irq)` / `pic_clear_mask(irq)` | Mask or unmask one line (0-15). |
+| `pic_send_eoi(irq)` | Acknowledge the interrupt, including the cascade line for IRQ8-15. |
+
+### Frame contract
+
+`registers_t` in `interrupt.h` must match the pushes in `isr.asm` exactly; two static asserts pin `sizeof(registers_t) == 64` and `eip` at offset 44. The stubs normalise the frame so exceptions that carry a CPU error code (8, 10-14, 17) have the same shape as the ones that do not.
+
+### What it does not do
+
+- **No GDT of its own.** Gates use selector `0x08`, which is whatever the multiboot loader left in CS; there is no GDT code in the repository.
+- **Nothing registers a handler by default.** An unhandled exception panics with the vector mnemonic; an IRQ without a handler is only acknowledged (the EOI is still sent so the controller keeps running).
+- **All IRQ lines start masked** - a driver must call `pic_clear_mask()` for the line it wants.
+- No APIC support, no PIT/8254 driver (IRQ0 only fires because QEMU/BIOS leave the PIT running), no per-vector priority, no DPL3 (user) gates and no `int 0x80` syscall gate.
+- **Nothing in the repository calls `interrupt_init()` yet** - the project still has no boot code.
+
+### Testing
+
+Exercised under QEMU (`-kernel`, multiboot): IDT limit/base via `sidt`, software `int $0x2F` and `int3`, a real `#GP` with its error code, a real timer IRQ0 on vector 32 after `pic_clear_mask(0)` + `sti()`, and an unhandled exception reaching `kernel_panic()`. The harness lives outside the repository; there is no in-repo test suite.
+
+## 7. Kernel information - `Kernel/openkernel_information.h`
 
 ```c
 #define KRNL_NAME        "OpenKernel"
@@ -195,7 +232,7 @@ typedef struct {
 
 Informational only. No file in the repository includes it, and `KRNL_LAST_COMMIT` is stale compared with the current HEAD.
 
-## 7. Typical initialisation order
+## 8. Typical initialisation order
 
 These services have interdependencies. A safe order from your `kernel_main()`:
 
@@ -206,12 +243,14 @@ void kernel_main(void)
 
     heap_init(_heap_start, 0x100000); /* 2. heap - needed by kmalloc users   */
 
-    kbd_init();                     /* 3. input                              */
+    interrupt_init();               /* 3. IDT + PIC, IRQs start masked       */
 
-    /* 4. optional: paging only once you have a fault handler */
+    kbd_init();                     /* 4. input                              */
+
+    /* 5. optional: paging only once you have a fault handler */
     /* paging_init();               */
 
-    /* 5. optional: diagnostics */
+    /* 6. optional: diagnostics */
     /* securchk_result_t r; securchk_run(&r); */
 }
 ```
@@ -220,6 +259,7 @@ Rules of thumb:
 
 - Anything that prints requires `vga_init()` first.
 - Anything that allocates requires `heap_init()` first.
+- Anything that registers a handler or unmasks an IRQ requires `interrupt_init()` first; a driver then calls `pic_clear_mask()` for its own line.
 - `log_message()` is usable: `log.h` now owns the `klog_level_t` typedef (the duplicate enum in `structs.h` was removed in favour of including `log.h`).
 
 ---

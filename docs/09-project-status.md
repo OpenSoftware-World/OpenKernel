@@ -145,8 +145,8 @@ Legend: **Works** = functional in isolation once initialised. **Partial** = usab
 ### Absent entirely
 
 - Bootloader, `_start`, multiboot header, `kernel_main`
-- IDT, GDT, PIC or APIC programming, any interrupt or exception handling
-- Timer interrupts, PIT, APIC timer
+- GDT or APIC programming (the IDT, 8259A PIC remap and exception/IRQ dispatch now live in `Kernel/Components/InterruptServices/`)
+- A PIT/APIC timer driver - IRQ0 can be delivered through the PIC, but nothing programs a timer
 - Real preemptive multitasking or a context switch
 - A userspace syscall gate (`int 0x80`, `sysenter`, ring transitions)
 - `printf` or any varargs formatting
@@ -168,7 +168,7 @@ The project README lists a feature checklist. Here is how it compares with the c
 | Basic CPU control (CLI, HLT, etc.) | Accurate |
 | Kernel service infrastructure | Partial - the code exists but `log.c` does not compile and nothing calls the services |
 | Memory management | Overstated - a bump allocator with a no-op `kfree`, and `heap_init()` is never called |
-| Interrupt handling (IDT) | Correctly marked as not done - no interrupt code exists |
+| Interrupt handling (IDT) | Accurate - `Kernel/Components/InterruptServices/` now provides the IDT, PIC remap and dispatch; no driver registers an IRQ handler yet |
 | Keyboard driver | Overstated - polling works in principle, but there is no ring buffer, no modifier keys, and it does not compile on GCC 14 |
 | File system (OFS) | Overstated - OFS exists and compiles, but has an out-of-bounds table bug and never persists metadata |
 | Project structure lists a `Boot/` folder | Inaccurate - there is no `Boot/` directory in the repository |

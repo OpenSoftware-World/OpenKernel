@@ -17,7 +17,7 @@ Current version: **4.0** (see `version.txt`).
 Being precise here saves you a lot of time:
 
 - **It is not a bootable operating system.** The repository contains no assembly files, no multiboot header, no `_start` symbol, and no `kernel_main`. The `link.ld` script declares `ENTRY(_start)`, but nothing defines it. You must supply the entry point.
-- **It is not a complete kernel.** There is no interrupt controller setup, no IDT, no GDT, no timer interrupt, and no privilege levels. Keyboard and mouse input are polled, not interrupt driven.
+- **It is not a complete kernel.** There is now an IDT with exception/IRQ dispatch and 8259A PIC remap (`Kernel/Components/InterruptServices/`), but there is no GDT, no APIC, no timer driver and no privilege levels. Keyboard and mouse input are polled, not interrupt driven.
 - **It is not a userspace syscall interface.** The `syscall()` function is an ordinary C function call inside the kernel. There is no `int 0x80`, no `sysenter`, and no ring transition.
 - **It is not a general-purpose library for user programs.** Everything runs in kernel context.
 

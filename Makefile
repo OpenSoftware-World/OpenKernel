@@ -26,7 +26,7 @@ LDFLAGS = -m elf_i386 -T link.ld
 # Source Files
 # Refers to the source files of OpenKernel and your OpenKernel-based operating system.
 # You can modify this section as long as you customize OpenKernel to suit your needs. (Don’t forget to include the code files you’ve added here as well.)
-ASM_SRC = # Bootloader and assembly files (You must specify the file paths.)
+ASM_SRC = OpenKernel/Kernel/Components/InterruptServices/isr.asm
 C_SRC = OpenKernel/Drivers/Vga/vga.c \
 	    OpenKernel/Drivers/Cpu/cpu.c \
 		OpenKernel/FS/OFS/ofs.c \
@@ -55,7 +55,9 @@ C_SRC = OpenKernel/Drivers/Vga/vga.c \
 		OpenKernel/Kernel/KernelServices/VirtualMem/vmem.c \
 		OpenKernel/Kernel/KernelServices/SecurityChecker/security.c \
 		OpenKernel/SystemLib/TaskMng/task.c \
-		OpenKernel/SystemLib/TypeConversion/type_conv.c
+		OpenKernel/SystemLib/TypeConversion/type_conv.c \
+		OpenKernel/Kernel/Components/InterruptServices/interrupt.c \
+		OpenKernel/Kernel/Components/InterruptServices/pic.c
 
 # Obj
 # Specifies where the compiled files will be stored. (Unless you plan to redesign the system from scratch, please do not change this setting.)

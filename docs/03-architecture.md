@@ -12,7 +12,8 @@ This document describes how the repository is organised, how the build works, an
 OpenKernel/
 ├── Kernel/                          Kernel core
 │   ├── ErrorHandler/panic.c         kernel_panic()
-│   ├── KernelServices/
+│   ├── Components/
+│   │   ├── InterruptServices/       IDT, PIC remap, exception/IRQ dispatch
 │   │   ├── LogService/log.c         Coloured log output
 │   │   ├── SecurityChecker/         Runtime self-checks (PSC)
 │   │   ├── SystemManagement/        Shutdown / reboot / exit

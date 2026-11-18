@@ -9,7 +9,7 @@
 Two rules apply to every driver:
 
 1. **You must call the `*_init()` function first.** Most drivers keep an "enabled" flag and silently do nothing until initialisation.
-2. **Almost everything is polled, not interrupt driven.** There is no IDT, no PIC programming, and no IRQ handlers anywhere in the project.
+2. **Almost everything is polled, not interrupt driven.** An IDT, PIC remap and dispatcher now exist in `Kernel/Components/InterruptServices/`, but no driver registers an IRQ handler yet - every driver still polls.
 
 ## Driver status overview
 

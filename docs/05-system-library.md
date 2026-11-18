@@ -134,7 +134,7 @@ for (i = 0; i < seconds * 50000000ULL; i++) nop();
 Consequences you must know:
 
 - The CPU runs at 100% for the whole duration. Nothing is suspended.
-- There is no timer interrupt and no PIT or APIC timer driver in the project, so this is the only delay primitive available.
+- There is no PIT or APIC timer driver in the project (the IRQ0 path through `InterruptServices` works, but nothing programs a timer), so this is the only delay primitive available.
 - The `50000000` constant is an estimate. Actual wall-clock duration varies with QEMU flags, `-smp`, and host load. Under `-smp 4` it will not be accurate.
 - `uptime()` relies on the same class of counting and is not a reliable uptime counter.
 
@@ -177,7 +177,7 @@ The data structures exist; the mechanism does not.
 - `task_list` and `current` are declared `static`; `SecurityChecker` reaches the list through the `task_list_head()` accessor added to `task.c`, so the globals stay private.
 - Nothing in the repository calls `taskmng_init()`, `task_create()`, `yield()`, or `schedule()`.
 
-Treat this module as a **skeleton you can build on**, not as working multitasking. Real preemption would require an IDT, a timer IRQ, and assembly context-switch code, none of which exist here.
+Treat this module as a **skeleton you can build on**, not as working multitasking. Real preemption would require an IDT, a timer IRQ, and assembly context-switch code. The IDT and IRQ delivery now exist (`InterruptServices`), but no context-switch assembly does.
 
 ## 6. Type conversion - `SystemLib/TypeConversion/type_conv.c`
 
@@ -245,7 +245,7 @@ int syscall_handler(int id, void* arg);
 
 A `switch` statement over 43 syscall numbers (0 to 42), mapping each number to a direct C function call. It is **an internal dispatch table, not a real syscall mechanism**:
 
-- No `int 0x80`, no `sysenter`, no IDT gate.
+- No `int 0x80` gate and no `sysenter` - the IDT itself exists now (`InterruptServices`), but no syscall vector is installed in it.
 - No privilege level transition; everything runs in kernel mode.
 - `syscall()` is a plain function call to `syscall_handler()`.
 
