@@ -19,14 +19,14 @@ This document explains what you need installed, how to set up a Linux host, and 
 | `qemu-system-i386` | Emulator used by `make run`. |
 | `grub-mkrescue` | Builds the bootable ISO. |
 | `xorriso` | Used by `grub-mkrescue` under the hood. |
-| `grub-pc-bin` | Provides the 32-bit GRUB modules for `grub-mkrescue`. |
+| `grub-pc-bin` (Debian) / `grub2-pc-modules` (Fedora) / `grub` (Arch) | Provides the 32-bit GRUB modules for `grub-mkrescue`. |
 
 ### Optional tools
 
 | Tool | Why |
 |---|---|
 | `git` | Version control and the release changelog. |
-| PulseAudio (`pulseaudio`) | The `make run` command attaches a Sound Blaster 16 device through `-audiodev pa`. Without a working audio backend QEMU may warn or fail on that device. |
+| PulseAudio client library | The `make run` command attaches a Sound Blaster 16 device through `-audiodev pa`. Without a working audio backend QEMU may warn or fail on that device. |
 
 ### Platform
 
@@ -42,11 +42,25 @@ sudo ./install_pkg.sh
 The script does the following:
 
 1. Detects the package manager (`apt`, `dnf`, or `pacman`).
-2. Updates the system.
-3. Installs the development packages: `nasm`, `gcc`, `make`, `qemu-system-x86`, `grub`, `xorriso`, `binutils`, `git`.
-4. Installs `pulseaudio`.
+2. Refreshes the package lists. On Arch Linux a full upgrade always runs, because partial upgrades are unsupported there; on apt and dnf a full system upgrade only runs when you pass `--upgrade`.
+3. Installs everything the `Makefile` needs: `nasm`, `make`, `xorriso`, `grub-mkrescue` together with the 32-bit GRUB modules, `qemu-system-i386`, `qemu-img`, `git` and the PulseAudio client library used by QEMU's `-audiodev pa`.
+4. Builds the `i686-elf` cross compiler (`i686-elf-gcc` + `i686-elf-ld`) from GNU sources when it is not already installed. This step downloads binutils and GCC and compiles them into `/usr/local`; it is by far the slowest part, roughly 15-40 minutes on the first run, and later runs skip it. The defaults are GCC 14.2.0 and binutils 2.43, the versions the project is tested with; override them with `OPENKERNEL_GCC_VERSION` and `OPENKERNEL_BINUTILS_VERSION` if needed. The build needs about 4 GB of free disk space in `/var/tmp` (override the location with `OPENKERNEL_CROSS_BUILD_DIR`).
+5. Verifies every tool and prints a checklist. The script exits with a non-zero status if a required tool is still missing, so you know `make` will work before you even try it.
 
-**Important limitation:** the script installs the *host* GCC, not the cross compiler. You still have to build or obtain `i686-elf-gcc` yourself, as stated in `notes.txt`. Without it, `make` fails immediately with `i686-elf-gcc: command not found`.
+Options:
+
+| Option | Effect |
+|---|---|
+| `--skip-update` | Do not refresh the package lists before installing |
+| `--upgrade` | Also perform a full system upgrade before installing |
+| `--skip-cross` | Skip the cross compiler build (`make` fails without it) |
+| `--verify-only` | Only print the checklist; installs nothing and does not need root |
+
+To re-check the tools at any time without installing anything:
+
+```bash
+./install_pkg.sh --verify-only
+```
 
 ## 3. Understanding the two directory layouts
 

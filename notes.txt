@@ -1,6 +1,6 @@
 To make sure you're ready to develop an OpenKernel-based operating system, do the following (Applies only to Linux distributions.):
 
-* Open your terminal and type “chmod +x install_pkg.sh”, then type ./install_pkg.sh to download the essential packages you need to get started with system development. (You will need to download the i686-elf-gcc package yourself.)
+* Open your terminal and type “chmod +x install_pkg.sh”, then type ./install_pkg.sh to download the essential packages you need to get started with system development. (The script also builds the i686-elf cross compiler, i686-elf-gcc and i686-elf-ld from source when it is missing, so you do not need to set it up yourself. The first run takes longer because of this build.)
 
 Now let’s get to what you need to do to develop your OpenKernel-based operating system:
 
