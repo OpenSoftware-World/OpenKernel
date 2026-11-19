@@ -42,11 +42,6 @@ void serial_print_string(const char *string) {
     }
 }
 
-char serial_read_char() {
-    while (!(inb(COM1_PORT + 5) & SERIAL_LINE_STATUS_DATA_READY));
-    return inb(COM1_PORT);
-}
-
 int serial_received() {
     return inb(COM1_LSR) & 1;
 }
