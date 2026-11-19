@@ -35,5 +35,6 @@ typedef struct {
 void fat12_init(uint32_t boot_lba);
 int fat12_read_file(const char* file_name, void* buf, uint32_t size);
 uint16_t fat12_get_next_cluster(uint16_t cluster);
+void fat12_list_root();
 
 #endif

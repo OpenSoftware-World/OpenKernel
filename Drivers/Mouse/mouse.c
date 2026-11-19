@@ -11,7 +11,7 @@
 #define MOUSE_LEFT_LIMIT 0
 #define MOUSE_RIGHT_LIMIT (VGA_WIDTH - 1)
 
-extern uint16_t *vgabuffer = (uint16_t *)0xB8000;
+extern uint16_t *vgabuffer;
 extern uint16_t screen_buffer[VGA_WIDTH * VGA_HEIGHT];
 
 static bool_t mouse_enabled_driver = false;

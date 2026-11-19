@@ -1,10 +1,6 @@
 #ifndef ATA_H
 #define ATA_H
 
-/*
- * ATA Driver for OpenKernel
-*/
-
 #include <OpenKernel/SystemLib/Std/types.h>
 
 #define ATA_DATA 0x1F0
@@ -22,7 +18,13 @@
 #define ATA_WRITE 0x30
 
 #define ATA_STATUS_BSY 0x80
+#define ATA_STATUS_DRDY 0x40
+#define ATA_STATUS_DF 0x20
 #define ATA_STATUS_DRQ 0x08
+#define ATA_STATUS_ERR 0x01
+
+/* ata_sys_disk_read()/write() always move exactly one sector. */
+#define ATA_SECTOR_SIZE 512
 
 #define ATA_CONTROL 0x3F6
 #define ATA_SRST 0x04
@@ -35,7 +37,7 @@ void ata_reinit(uint8_t drive, uint16_t* identify_buf);
 void ata_identify(uint8_t drive, uint16_t* buf);
 
 #define ATA_DRIVER_NAME "OpenKernel ATA Disk Driver"
-#define ATA_DRIVER_VER "0.3"
+#define ATA_DRIVER_VER "0.4"
 #define ATA_DRIVER_DESC "A simple ATA Disk Driver for OpenKernel"
 #define ATA_DRIVER_AUTHOR "OpenSoftware-World"
 #define ATA_DRIVER_KRNL_VER "2.0"

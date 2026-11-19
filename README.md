@@ -44,7 +44,7 @@ A complete documentation set lives in the [`docs/`](docs/) folder. Start at the 
 | [Architecture](docs/03-architecture.md) | Directory layout, Makefile, linker script |
 | [Project Status](docs/09-project-status.md) | Honest report of what currently works and what does not |
 
-> **Note:** the project does not currently build or boot on its own. Read [09 - Project Status](docs/09-project-status.md) before you start.
+> **Note:** In it's current state that is, without the operating system files (e.g., "main.c") this project cannot be compiled; furthermore, you would need to write a bootloader to be able to compile it. (Note: You must write a GRUB-compatible bootloader, rather than a complete, standalone bootloader.) Read [09 - Project Status](docs/09-project-status.md) before you start.
 
 ## Star History
 

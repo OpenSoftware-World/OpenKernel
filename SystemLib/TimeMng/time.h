@@ -21,9 +21,9 @@ void sleep(uint32_t seconds);
 
 #define TIME_MODULE_NAME "Time Library"
 #define TIME_MODULE_DESC "Time Library for OpenKernel"
-#define TIME_MODULE_VER "1.0"
+#define TIME_MODULE_VER "2.0"
 #define TIME_MODULE_AUTHOR "OpenSoftware-World"
 #define TIME_MODULE_FILE_NAME "time.lib"
-#define TIME_MODULE_KRNL_VER "2.0"
+#define TIME_MODULE_KRNL_VER "4.0"
 
 #endif

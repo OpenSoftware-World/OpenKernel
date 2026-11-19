@@ -28,9 +28,11 @@ void  kfree(void* ptr);
 
 `kmalloc()` is a **bump allocator**:
 
-1. Rounds the requested size up to a multiple of 4.
-2. Returns the current pointer and advances `heap_current` by the rounded size.
-3. Returns `NULL` if the request would reach or pass `heap_end`.
+1. Rejects sizes above `0xFFFFFFFC`, which would overflow the 4-byte alignment rounding and wrap to a small value that passes the bound check.
+2. Rounds the requested size up to a multiple of 4.
+3. Rejects a cursor that would wrap past the start of memory.
+4. Returns the current pointer and advances `heap_current` by the rounded size.
+5. Returns `NULL` if the request would reach or pass `heap_end`.
 
 ```c
 heap_init(0x100000, 1024 * 1024);   /* 1 MiB heap */
@@ -44,7 +46,7 @@ int* b = (int*)kmalloc(16);
 - **`kfree()` does nothing.** Its entire body is `(void)ptr;`. Memory allocated with `kmalloc` is never reclaimed. Every allocation permanently consumes heap space.
 - There is no free list, no block headers, no coalescing, and no reuse.
 - Alignment is 4 bytes only. DMA-capable buffers (for example those the AHCI driver needs) are not guaranteed any stronger alignment.
-- **`heap_init()` is never called anywhere in the repository.** If you call `kmalloc()` first, `heap_current` is still 0 and the allocator will hand out addresses starting at `0x0`. Always call `heap_init()` before the first allocation.
+- **`heap_init()` is never called anywhere in the repository.** Before it runs, `heap_start`, `heap_end` and `heap_current` are all 0, so every `kmalloc()` fails the bound check and returns `NULL` - it does **not** hand out addresses starting at `0x0`. That is the safe outcome, but it means no dynamic allocation works today: `e1000_init()` in particular bails out on its first allocation.
 - The linker script reserves a 1 MiB `.heap` region with `_heap_start` and `_heap_end` symbols, but nothing connects them to `heap_init()` automatically.
 
 ## 2. String functions - `SystemLib/Std/std.c`
@@ -125,18 +127,19 @@ Values arrive in BCD and are converted with `bcd_to_bin()`. The result is stored
 
 ### Sleeping
 
-`sleep(seconds)` is a **pure busy loop**:
+`sleep(seconds)` hands the wait to the PIT driver:
 
 ```c
-for (i = 0; i < seconds * 50000000ULL; i++) nop();
+pit_sleep_ms(seconds * 1000);   /* seconds is clamped so the multiply cannot wrap */
 ```
 
 Consequences you must know:
 
-- The CPU runs at 100% for the whole duration. Nothing is suspended.
-- There is no PIT or APIC timer driver in the project (the IRQ0 path through `InterruptServices` works, but nothing programs a timer), so this is the only delay primitive available.
-- The `50000000` constant is an estimate. Actual wall-clock duration varies with QEMU flags, `-smp`, and host load. Under `-smp 4` it will not be accurate.
-- `uptime()` relies on the same class of counting and is not a reliable uptime counter.
+- It only waits if `pit_init()` has run **and** the interrupt flag is set. `pit_sleep_ms()` returns immediately otherwise, so an uninitialised system gets a no-op delay rather than a hang.
+- The wait is driven by the IRQ0 millisecond counter, so it is accurate to one tick (1 ms at the default 1 kHz) and does not depend on CPU speed or host load. It still burns CPU - it is a busy-wait with `hlt` between ticks, not a suspended task.
+- It cannot be called from inside an IRQ handler: the ticks it waits for could not be delivered while that handler runs.
+- It used to be a `nop()` loop of `seconds * 50000000ULL` iterations, which was an estimate tied to one CPU speed.
+- `uptime()` still reads the RTC through CMOS, not the PIT, so it is a wall-clock reading rather than an uptime counter.
 
 ## 5. Task management - `SystemLib/TaskMng/task.c`
 
@@ -167,12 +170,14 @@ void    task_unblock(task_t *task);
 
 The data structures exist; the mechanism does not.
 
-- **There is no context switch.** The `esp`, `ebp`, and `eip` fields are never saved or restored. The repository contains no assembly code at all, and a context switch on x86 requires it.
+- **There is no context switch.** The `esp`, `ebp`, and `eip` fields are never saved or restored. The only assembly in the repository is `isr.asm`, which builds interrupt stubs; a context switch on x86 needs its own assembly and it does not exist.
 - `task_create()` sets `eip = (uint32_t)entry` and `esp = 0`. The `stack` buffer it allocates with `kmalloc()` is never used as a stack.
 - `schedule()` simply does `current = current->next;` on a circular list. It does not check `state`, so blocked and terminated tasks are still selected.
 - `yield()` calls `schedule()` and then calls `current->entry()` directly from the top. That *restarts* the task function rather than resuming it, producing nested and recursive execution instead of multitasking.
 - `task_block()` advances `current` but never runs the next task.
-- `task_sleep(uint32_t ms)` calls `sleep(ms)`, but `sleep()` takes **seconds**, so the unit is wrong by a factor of 1000.
+- `task_sleep(uint32_t ms)` now calls `pit_sleep_ms(ms)`. It used to call `sleep(ms)` while `sleep()` takes **seconds**, which was wrong by a factor of 1000.
+- `task_create()` now rejects a `NULL` entry or a zero `stack_size`, and frees the task and returns `NULL` when the stack allocation fails.
+- `task_add()` refuses to insert a task that is already in the list and bounds its walk, so a corrupted link cannot hang the kernel. `task_remove()` used to compare `prev` with `cur` on the first pass, where they are always equal, so removing the head wiped the entire list; the test is now "is this list a single-element circle".
 - `task_destroy()` calls `kfree()`, which is a no-op, so stacks leak.
 - `task_list` and `current` are declared `static`; `SecurityChecker` reaches the list through the `task_list_head()` accessor added to `task.c`, so the globals stay private.
 - Nothing in the repository calls `taskmng_init()`, `task_create()`, `yield()`, or `schedule()`.
@@ -198,7 +203,7 @@ htoan(0x000A8000, buf, 8);   /* "000a8000" */
 
 `bcd_to_bin()` computes `((v / 16) * 10) + (v & 0x0F)` and is correct; `time.c` depends on it.
 
-**This module does not compile.** There are two syntax errors: a stray `str1[1] = '\0';` that references an undeclared identifier in `itoa()`, and a missing semicolon in `htoan()`.
+**Compiles clean.** Two syntax errors that older revisions of this document reported (a stray `str1[1] = '\0';` in `itoa()` and a missing semicolon in `htoan()`) are no longer present in the source.
 
 ## 7. Kernel function registry - `SystemLib/KernelFunc/kernel_func.c`
 

@@ -2,6 +2,7 @@
 #define E1000_H
 
 #include <OpenKernel/SystemLib/Std/types.h>
+#include <OpenKernel/Drivers/PCIBus/pci.h>
 
 #define E1000_VENDOR_ID 0x8086
 
@@ -56,11 +57,12 @@ typedef struct {
     bool_t link_up;
 } e1000_t;
 
-bool_t e1000_init();
+bool_t e1000_init(pci_dev_t *pdev);
 void e1000_send_packet(void *data, uint16_t len);
+void e1000_receive_poll(void);
 
 #define E1000_DRIVER_NAME "OpenKernel Intel E1000 Driver"
-#define E1000_DRIVER_VER "0.2"
+#define E1000_DRIVER_VER "0.3"
 #define E1000_DRIVER_DESC "A Intel E1000 for OpenKernel"
 #define E1000_DRIVER_AUTHOR "OpenSoftware-World"
 #define E1000_DRIVER_KRNL_VER "2.0"

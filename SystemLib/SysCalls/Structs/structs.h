@@ -2,8 +2,6 @@
 #define STRUCTS_H
 
 #include <OpenKernel/SystemLib/Std/types.h>
-/* log.h owns the kernel_log_level enum; defining it here as well made
-   the two headers collide in translation units that use both. */
 #include <OpenKernel/Kernel/KernelServices/LogService/log.h>
 
 typedef struct {
@@ -38,6 +36,11 @@ typedef struct {
     klog_level_t level;
     const char *message;
 } log_message_t;
+
+typedef struct {
+    const char *mode;
+    uint32_t seconds;
+} sys_next_status_t;
 
 typedef struct {
     const char *mode;

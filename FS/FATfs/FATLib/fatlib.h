@@ -3,6 +3,13 @@
 
 #include <OpenKernel/SystemLib/Std/types.h>
 
+/*
+ * Cap on a cluster chain walk. A FAT whose entries point back at themselves
+ * would otherwise spin a directory listing forever; 65536 clusters is 32 MiB
+ * at one sector per cluster, far more than this driver can address anyway.
+ */
+#define FAT_MAX_CLUSTER_STEPS 65536u
+
 typedef struct {
     char file_name[11];
     uint8_t attr;

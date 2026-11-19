@@ -16,16 +16,24 @@ static const char kmap[128] __attribute__((section(".rodata"))) = {
     '*',0,' ',0
 };
 
-static char kbf[KEY_BF_SIZE]__attribute__((unused));
+static char kbf[KEY_BF_SIZE];
 static uint8_t buf_head = 0;
 static uint8_t buf_tail = 0;
 
 static char to_upper(char c) {
-    if (!kbd_enabled_driver) return;
+    if (!kbd_enabled_driver) return c;
     if (caps_lock && c >= 'a' && c <= 'z') {
         return c - 32;
     }
     return c;
+}
+
+/* Store a translated character in the ring buffer; drop it when full. */
+static void kbd_push(char c) {
+    uint8_t next = (uint8_t)((buf_head + 1) % KEY_BF_SIZE);
+    if (next == buf_tail) return;
+    kbf[buf_head] = c;
+    buf_head = next;
 }
 
 void kbd_init() {
@@ -36,44 +44,38 @@ void kbd_init() {
 }
 
 uint8_t kb_check() {
-    if (!kbd_enabled_driver) return;
+    if (!kbd_enabled_driver) return 0;
     return buf_head != buf_tail;
 }
 
 char get_char() {
-    if (!kbd_enabled_driver) return;
-    uint8_t scancode;
+    if (!kbd_enabled_driver) return 0;
 
-    while (1) {
+    /* Drain the ring buffer first; poll the controller only when empty. */
+    while (buf_head == buf_tail) {
         while (!(inb(KBD_STAT) & 1));
 
-        scancode = inb(KBD_DATA);
-
-        if (scancode & 0x80) {
-            continue;
-        }
-
-        kbd_hndlr(scancode);
-
-        if (scancode < 128) {
-            char c = kmap[scancode];
-
-            if (c == 0) {
-                continue;
-            }
-            
-            c = to_upper(c);
-
-            return c;
-        }
+        kbd_hndlr(inb(KBD_DATA));
     }
+
+    char c = kbf[buf_tail];
+    buf_tail = (uint8_t)((buf_tail + 1) % KEY_BF_SIZE);
+    return c;
 }
 
 void kbd_hndlr(uint8_t scancode) {
     if (!kbd_enabled_driver) return;
+    if (scancode & 0x80) return; /* break code: nothing to translate */
     if (scancode == 0x3A) {
         caps_lock = !caps_lock;
+        return;
     }
+    if (scancode >= 128) return;
+
+    char c = kmap[scancode];
+    if (c == 0) return;
+
+    kbd_push(to_upper(c));
 }
 
 void kbd_close() {

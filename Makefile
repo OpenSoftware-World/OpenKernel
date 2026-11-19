@@ -40,7 +40,7 @@ C_SRC = OpenKernel/Drivers/Vga/vga.c \
 		OpenKernel/SystemLib/TimeMng/time.c \
 		OpenKernel/Kernel/KernelServices/SystemManagement/sysmng.c \
 		OpenKernel/SystemLib/Std/std.c \
-		OpenKernel/Drivers/Sound/sb16.c \
+		OpenKernel/Drivers/Sound/sb16/sb16.c \
 		OpenKernel/Drivers/Keyboard/keyboard.c \
 		OpenKernel/Drivers/Serial/serial.c \
 		OpenKernel/FS/FATfs/FAT12/fat12.c \
@@ -50,7 +50,7 @@ C_SRC = OpenKernel/Drivers/Vga/vga.c \
 		OpenKernel/Drivers/PCIBus/pci.c \
 		OpenKernel/Drivers/Network/Ethernet/ethernet.c \
 		OpenKernel/Drivers/Network/e1000/e1000.c \
-		OpenKernel/Drivers/Network/rtl8139/rtl8139.c \
+		OpenKernel/Drivers/Network/RTL8139/rtl8139.c \
 		OpenKernel/Kernel/ErrorHandler/panic.c \
 		OpenKernel/Kernel/KernelServices/LogService/log.c \
 		OpenKernel/Kernel/KernelServices/VirtualMem/vmem.c \

@@ -46,13 +46,14 @@
 #define SYSCALL_STRCPY          40
 #define SYSCALL_STRNCPY         41
 #define SYSCALL_PRINT_TIME      42
+#define SYSCALL_SYS_NEXT_STATUS 43
 
 int syscall(int id, void* arg);
 int syscall_handler(int id, void* arg);
 
 #define SYSCALL_MODULE_NAME "Syscall Library"
 #define SYSCALL_MODULE_DESC "Syscall Library for OpenKernel"
-#define SYSCALL_MODULE_VER "2.0"
+#define SYSCALL_MODULE_VER "2.5"
 #define SYSCALL_MODULE_AUTHOR "OpenSoftware-World"
 #define SYSCALL_MODULE_FILE_NAME "syscall.lib"
 #define SYSCALL_MODULE_KRNL_VER "3.0"

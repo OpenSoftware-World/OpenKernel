@@ -37,8 +37,8 @@ void openkernel_universal_api_vga_set_color_scheme(uint8_t bg_color, uint8_t tex
     syscall(10, &args);
 }
 
-void openkernel_universal_api_get_char() {
-    syscall(11, NULL);
+char openkernel_universal_api_get_char() {
+    return (char)syscall(11, NULL);
 }
 
 void openkernel_universal_api_sleep(uint32_t seconds) {

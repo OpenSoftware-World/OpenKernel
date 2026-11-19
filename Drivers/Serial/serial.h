@@ -32,7 +32,7 @@ void serial_set_status(bool_t val);
 void serial_loopback_test();
 
 #define SERIAL_DRIVER_NAME "OpenKernel Serial (COM1_PORT) Driver"
-#define SERIAL_DRIVER_VER "0.3"
+#define SERIAL_DRIVER_VER "0.4"
 #define SERIAL_DRIVER_DESC "A Serial (COM1_PORT) driver for OpenKernel"
 #define SERIAL_DRIVER_AUTHOR "OpenSoftware-World"
 #define SERIAL_DRIVER_KRNL_VER "3.0"

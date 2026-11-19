@@ -8,15 +8,14 @@ This document covers how to work on OpenKernel itself: the contribution workflow
 
 ## 1. Before you contribute
 
-Read [09 - Project Status](09-project-status.md) first. The repository does not currently build, so a contribution that "adds a feature" without a working build is impossible to verify. Fixing the build blockers is the highest-value work available right now.
+Read [09 - Project Status](09-project-status.md) first. The tree now compiles and links in one pass, so a contribution can be verified with `make`. What is still missing is a boot path: there is no `_start`, no multiboot header and no `Boot/` directory, so nothing can be executed yet.
 
 Suggested order of impact:
 
-1. Fix the `log.h` enum declaration (unblocks three files at once).
-2. Fix the Makefile paths.
-3. Fix the duplicate `vgabuffer` definition.
-4. Fix the `ata_read_sector` naming mismatch.
-5. Add a minimal boot path (`boot.asm` plus `grub.cfg`) so the project can actually be run and tested.
+1. Add a minimal boot path (`Boot/boot.asm` with a multiboot header and `_start`, plus `Boot/grub/grub.cfg`) so the project can actually be run and tested. This is the only remaining link-time blocker.
+2. Call `heap_init()` from the new entry point, using the `_heap_start` / `_heap_end` symbols `link.ld` already provides. Until then `kmalloc()` returns `NULL` for every request.
+3. Decide the KernelAPI scalar-versus-pointer argument convention; it is the source of the four remaining compiler warnings.
+4. Add a test or CI job. There is no automated verification of any kind today.
 
 ## 2. Contribution workflow
 

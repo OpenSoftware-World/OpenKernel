@@ -42,11 +42,20 @@ void heap_init(uint32_t start, uint32_t size) {
 }
 
 void* kmalloc(uint32_t size) {
-    size = (size + 3) & ~3;
+    if (size > 0xFFFFFFFCu) {
+        return (void*)0;
+    }
+
+    size = (size + 3) & ~3u;
+
+    if (heap_current + size < heap_current) {
+        return (void*)0;
+    }
 
     if (heap_current + size >= heap_end) {
         return (void*)0;
     }
+
     void* addr = (void*)heap_current;
     heap_current += size;
     return addr;

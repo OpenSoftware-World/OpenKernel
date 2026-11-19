@@ -72,6 +72,14 @@ void openkernel_nonuniversal_api_log_message(klog_level_t level, const char *mes
     syscall(24, &args);
 }
 
+void openkernel_nonuniversal_api_sys_next_status(const char *mode, uint32_t seconds) {
+    sys_next_status_t args = {
+        .mode = mode,
+        .seconds = seconds
+    };
+    syscall(43, &args);
+}
+
 void openkernel_nonuniversal_api_exit_program(const char *mode, const char *message) {
     exit_program_t args = {
         .mode = mode,

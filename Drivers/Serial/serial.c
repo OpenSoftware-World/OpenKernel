@@ -69,7 +69,7 @@ int serial_has_error() {
     return stat & (0x0E | 0x80);
 }
 
-int serial_get_errors() {
+int serial_get_error() {
     return inb(COM1_LSR) & (SERIAL_ERR_OVERRUN | SERIAL_ERR_PARITY | SERIAL_ERR_FRAME | SERIAL_ERROR_FIFO);
 }
 

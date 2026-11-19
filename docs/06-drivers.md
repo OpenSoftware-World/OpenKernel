@@ -19,15 +19,15 @@ Two rules apply to every driver:
 | CPU control | `Drivers/Cpu/` | Works (partial feature detection) |
 | PIT (8253/8254) | `Drivers/PIT/` | Compiles clean, registers IRQ0, untested on hardware |
 | ATA (PIO) | `Drivers/Ata/` | Works |
-| Keyboard | `Drivers/Keyboard/` | Partial - polling only, compile errors |
-| Mouse | `Drivers/Mouse/` | Partial - works, but breaks the link |
+| Keyboard | `Drivers/Keyboard/` | Partial - polling only, ring buffer wired up |
+| Mouse | `Drivers/Mouse/` | Partial - works when polled |
 | Sound Blaster 16 | `Drivers/Sound/sb16/` | Basic but functional |
 | AHCI | `Drivers/Ahci/` | Compiles clean, reworked, untested on hardware |
-| Serial (COM1) | `Drivers/Serial/` | Logic sound, does not compile |
-| PCI | `Drivers/PCIBus/` | Does not compile |
-| Ethernet layer | `Drivers/Network/Ethernet/` | Skeleton, does not compile |
-| Intel e1000 | `Drivers/Network/e1000/` | Placeholder, does not compile |
-| Realtek RTL8139 | `Drivers/Network/RTL8139/` | Placeholder, does not compile |
+| Serial (COM1) | `Drivers/Serial/` | Compiles clean, untested |
+| PCI | `Drivers/PCIBus/` | Compiles clean, untested |
+| Ethernet layer | `Drivers/Network/Ethernet/` | Skeleton, compiles clean |
+| Intel e1000 | `Drivers/Network/e1000/` | Compiles clean, BAR discovery added, untested |
+| Realtek RTL8139 | `Drivers/Network/RTL8139/` | Compiles clean, BAR discovery added, untested |
 
 ## 1. VGA text mode - `Drivers/Vga/`
 
@@ -58,7 +58,7 @@ void screen_init(void);
 ### Behaviour worth knowing
 
 - **`vga_init()` is mandatory.** Every print function checks an internal `vga_enabled_driver` flag and returns immediately if it is false. Forgetting this is the most common reason for a "nothing prints" bug.
-- `vga_clear_screen("F")` clears all 25 rows. `vga_clear_screen("C")` clears rows 1 to 23, keeping row 0 as a header.
+- `vga_clear_screen("F")` clears all 25 rows. `vga_clear_screen("C")` clears rows 1 to 24, keeping row 0 as a header.
 - `vga_cursor_mode("E", start, end)` shows the caret with the given scan lines; `vga_cursor_mode("D", 0, 0)` hides it.
 - A shadow copy `screen_buffer[80*25]` is maintained and refreshed by `screen_init()`. The mouse driver uses it to erase itself.
 - `vga_print_scr()` appends a newline; `vga_print_scr_nw()` does not.
@@ -79,8 +79,8 @@ void hlt(void);               /* halt until the next interrupt */
 void nop(void);
 void cpu_status(const char *mode);   /* "S" = hlt, "A" = sti */
 void get_sys_cpuinfo(const char *mode); /* "B" = brand string, "V" = vendor */
-uint32_t cpuinfo_data(uint32_t *eax, uint32_t *ebx, uint32_t *ecx,
-                      uint32_t *edx, uint32_t function_id);
+void cpuinfo_data(uint32_t *eax, uint32_t *ebx, uint32_t *ecx,
+                  uint32_t *edx, uint32_t function_id);
 ```
 
 `get_sys_cpuinfo("B")` reads CPUID leaves `0x80000002` to `0x80000004` for the brand string; `"V"` reads leaf 0 for the vendor string.
@@ -88,7 +88,7 @@ uint32_t cpuinfo_data(uint32_t *eax, uint32_t *ebx, uint32_t *ecx,
 Limitations:
 
 - `sys_cpuinfo_t` declares 17 feature flags (`sse`, `sse2`, `avx`, `mmx`, `avx2`, `vmx`, `sgx`, and so on) that are **never populated**. Feature detection does not exist yet.
-- `cpuinfo_data()` is declared as returning `uint32_t` but has no return statement; the warning is suppressed with a pragma.
+- `cpuinfo_data()` is `void`: CPUID writes through the four output pointers, so there is nothing to return. It used to be declared `uint32_t` with no `return`, which was silenced with a `#pragma GCC diagnostic` instead of being fixed.
 
 ## 3. Keyboard - `Drivers/Keyboard/`
 
@@ -102,14 +102,14 @@ void    kbd_hndlr(uint8_t scancode);
 void    kbd_close(void);
 ```
 
-`get_char()` busy-waits until port `0x64` bit 0 is set, reads the scancode from `0x60`, ignores break codes (`scancode & 0x80`), and maps through a 128-entry US-layout table. Caps Lock (scancode `0x3A`) is handled by `kbd_hndlr()` and upper-cases the result.
+`kbd_hndlr()` ignores break codes, toggles Caps Lock on scancode `0x3A`, maps make codes through a 128-entry US-layout table and pushes the result into a ring buffer (`kbf[KEY_BF_SIZE]` with `buf_head` / `buf_tail`). `get_char()` drains that buffer first and only polls port `0x64` when it is empty; `kb_check()` reports whether anything is pending.
 
 Limitations:
 
-- **Polling only.** No IRQ1, so `get_char()` burns CPU while waiting.
-- **No ring buffer.** The file declares `kbf[KEY_BF_SIZE]`, `buf_head`, and `buf_tail`, but they are never written or read. Each `get_char()` call consumes one scancode directly; if nothing reads, keystrokes are dropped.
+- **Polling only.** No IRQ1, so `get_char()` burns CPU while waiting for the controller.
+- **The ring buffer drops characters when full** rather than blocking or evicting.
 - Only the US layout. No Shift, Alt, or Ctrl handling, so symbols requiring Shift never appear correctly.
-- Three functions (`to_upper`, `kb_check`, `get_char`) contain `return;` statements in non-void functions, which is an error on GCC 14.
+- `kbd_init()` is never called anywhere in the repository, so `kbd_enabled_driver` stays false and every entry point returns 0.
 
 ## 4. Mouse - `Drivers/Mouse/`
 
@@ -133,9 +133,8 @@ Limitations:
 - **No IRQ12.** Everything is polled.
 - Button presses are received as part of the packet but no click handling exists.
 - The cursor is drawn by overwriting VGA cells directly, so it can cover text.
-- `mouse.c` declares `extern uint16_t *vgabuffer = (uint16_t *)0xB8000;`. That is a *definition* with an initializer, and `vga.c` defines the same symbol, producing `multiple definition of 'vgabuffer'` at link time.
+- `mouse.c` used to declare `extern uint16_t *vgabuffer = (uint16_t *)0xB8000;`, which is a *definition* with an initializer and collided with `vga.c` at link time. It is now a plain `extern` declaration; the definition stays in `vga.c`.
 - `mouse_clear()`, `mouse_put_char()`, and `prev_cell` are declared in the header but never defined.
-- `sleep` is used without an include, which is an error on GCC 14.
 
 ## 5. Serial - `Drivers/Serial/`
 
@@ -160,9 +159,8 @@ void serial_loopback_test(void);
 
 Status:
 
-- **Does not compile.** `serial_read_char()` is defined twice in `serial.c`, and line 121 references `COMR_MCR`, which should be `COM1_MCR`.
-- The header declares `serial_get_error()` while the source defines `serial_get_errors()`.
-- Once fixed, this driver is valuable: `make run` already passes `-serial stdio`, so output would appear on your terminal.
+- **Compiles clean.** `serial_read_char()` had been defined twice and line 121 referenced `COMR_MCR`; one definition was removed and the typo corrected. The header's `serial_get_error()` and the source now agree.
+- Never executed. `make run` already passes `-serial stdio`, so output would appear on your terminal as soon as there is a boot path.
 
 ## 6. Sound Blaster 16 - `Drivers/Sound/sb16/`
 
@@ -210,14 +208,15 @@ void ata_reinit(uint8_t drive, uint16_t *identify_buf);
 void ata_identify(uint8_t drive, uint16_t *buf);
 ```
 
-Reads and writes are single-sector LBA28 operations: the drive-select register receives `0x0E | (lba >> 24)`, the sector count is set to 1, the three LBA bytes are written, then command `0x20` (read) or `0x30` (write) is issued and 256 words are transferred over `0x1F0`.
+Reads and writes are single-sector LBA28 operations: the drive-select register receives `0xE0 | (lba >> 24)` (bit 5 selects LBA mode and bit 4 the drive; the old value `0x0E` was not a valid drive-select word), the sector count is set to 1, the three LBA bytes are written, then command `0x20` (read) or `0x30` (write) is issued and 256 words are transferred over `0x1F0`.
 
 Status:
 
-- **Functioning.** `ata_wait_busy()` polls the BSY bit, `ata_wait_drq()` polls DRQ.
+- **Functioning (compile-verified only).** `ata_wait_busy()` and `ata_wait_drq()` poll with a bounded iteration limit and abort on the `ERR` / `DF` status bits, so a dead or absent drive returns instead of hanging the kernel. A short delay after the drive-select write covers the 400 ns settle time the spec requires.
+- A failed read leaves a zeroed sector in the caller's buffer rather than stack garbage; a failed write leaves the sector on disk untouched.
 - `ata_sys_disk_init()` has an **empty body** - it is a stub.
 - Single sector only, no multi-sector transfers, no DMA, no 48-bit LBA (so no disks above 128 GiB).
-- FAT16 and FAT32 call a function named `ata_read_sector()`, which does not exist. The real name is `ata_sys_disk_read()`. This is why those two file systems fail to link.
+- All three FAT drivers call `ata_sys_disk_read()`, which is the correct name.
 
 ## 8. AHCI - `Drivers/Ahci/`
 
@@ -247,7 +246,7 @@ Behaviour worth knowing:
 
 Known limitations:
 
-- **Nothing in the repository calls `ahci_init()`**, and it cannot be linked yet: `ahci_init()` needs `pci_get_device()`, and `Drivers/PCIBus/pci.c` still fails to compile (see section 9).
+- **Nothing in the repository calls `ahci_init()`.** It links correctly now that `pci.c` compiles, but nothing invokes it, so it has never run.
 - Untested on real hardware or QEMU: the project has no boot code, so verification so far is compile-time only (structure asserts, clean `-Wall -Wextra` build).
 - No interrupts, no hot-plug, no ATAPI devices, no NCQ; everything is polled with busy-wait timeouts.
 
@@ -264,17 +263,18 @@ pci_dev_t* pci_get_device(int index);
 
 Configuration accesses build the standard address `0x80000000 | bus<<16 | dev<<11 | func<<8 | (offset & 0xFC)` and use ports `0xCF8` / `0xCFC`. `pci_scan()` walks all 256 buses, 32 devices, and reads vendor, device, class, and BAR0 to BAR5.
 
-An automatic probe helper `pci_dev_init()` detects class `0x02` (network), then matches vendor `0x8086` to `e1000_init()` and `0x10EC` to `rtl8139_init()`.
+An automatic probe helper `pci_dev_init()` (declared in `pci.h`) detects class `0x02` (network), enables I/O space, memory space and bus mastering in the command register, then matches vendor `0x8086` to `e1000_init(pdev)` and `0x10EC` to `rtl8139_init(pdev)`. Only the 16-bit command half of the dword is written back, so the write-1-to-clear status register above it is not disturbed.
 
 Status:
 
-- **Does not compile.** `pci.c` uses the type name `pci_device_t` while `pci.h` defines `pci_dev_t`, and it references `pci_device_count` where the actual variable is `pci_dev_count`.
-- `pci_scan()` never resets the counter it increments, so repeated scans double-count.
-- `pci_dev_init()` is not declared in `pci.h` and relies on implicit declarations.
+- **Compiles clean.** The `pci_device_t` / `pci_device_count` name mismatches are gone; the file uses `pci_dev_t` and `pci_dev_count`.
+- `pci_init()` resets `pci_dev_count` to 0 before scanning, so repeated scans do not double-count.
+- **No run-time evidence.** No BAR value has ever been observed, so the decode in `e1000_init()` / `rtl8139_init()` is untested against real hardware.
+- Only function 0 of each device is scanned; multi-function devices are not enumerated.
 
 ## 10. Network drivers - `Drivers/Network/`
 
-There is **no working network stack**. All three files fail to compile.
+There is still **no working network stack**. All three files compile and link, but none has ever been executed.
 
 ### Ethernet layer - `Ethernet/ethernet.c`
 
@@ -286,9 +286,10 @@ void ethernet_send(uint8_t *dest_mac, uint16_t ethertype, void *payload, uint16_
 
 `ethernet_register_device()` maintains a singly linked list of devices. `ethernet_send()` builds a 14-byte Ethernet header with `ETH_TYPE_ARP 0x0806` and `ETH_TYPE_IP4 0x0800` and calls the device's `send` function.
 
-Problems:
+Limitations:
 
-- Includes `<OpenKernel/SystemLib/Mem/mem.h>`; the directory is actually `SystemLib/Memory/`, so the include fails on a case-sensitive filesystem.
+- **Payload is clamped.** `len` is capped at `ETH_MAX_FRAME_SIZE - sizeof(eth_header_t)` (1504 bytes) so a bad length cannot run off the 1518-byte stack buffer or wrap the 16-bit `frame_len`. The caller's excess data is silently dropped, because the function returns `void` and cannot report an error.
+- `NULL` `dest_mac` / `payload` are rejected.
 - The source MAC is hard-coded to six `0xAA` bytes.
 - Transmission always goes through the *head* of the device list, not the device matching the destination.
 - `ethernet_init()` is declared but never defined.
@@ -297,32 +298,44 @@ Problems:
 ### Intel e1000 - `e1000/e1000.c`
 
 ```c
-bool_t e1000_init(void);
+bool_t e1000_init(pci_dev_t *pdev);
 void   e1000_send_packet(void *data, uint16_t len);
+void   e1000_receive_poll(void);
 ```
 
-TX and RX descriptor rings are allocated and the `TDBAL`, `TDLEN`, `TDH`, `TDT`, `RDBAL`, `RDLEN`, `RDH`, `RDT`, `RCTL`, and `TCTL` registers are programmed. That is where the realism stops:
+TX and RX descriptor rings are allocated and the `TDBAL`, `TDLEN`, `TDH`, `TDT`, `RDBAL`, `RDLEN`, `RDH`, `RDT`, `RCTL`, and `TCTL` registers are programmed. `e1000_init()` now:
 
-- `dev->mmio_base` is hard-coded to `0xF0000000`. There is no PCI BAR0 discovery and no page-table mapping for that address, so with paging enabled the accesses fault and with paging disabled they hit an unrelated physical range.
+- rejects anything that is not vendor `0x8086` with device ID `0x100E` (82540EM) or `0x100F` (82545EM);
+- reads BAR0, rejects an I/O BAR, a `0` BAR and an unimplemented `0xFFFFFFFF` BAR, masks off the four flag bits, and refuses a 64-bit BAR whose high half sits above 4 GiB (this target has only 32-bit pointers);
+- checks every `kmalloc()` result, including each 2048-byte receive buffer - a NULL there would make the NIC DMA to physical address 0;
+- resets its own state and returns `false` on any of those failures, so `send` / `receive` become no-ops instead of dereferencing NULL.
+
+Still missing:
+
 - No EEPROM or MAC address read, no link setup, no interrupt enable, no receive address filters.
-- `e1000_receive_poll()` computes a packet pointer and length and then discards both.
-- Same broken `SystemLib/Mem/mem.h` include, plus a `bool` vs `bool_t` return type mismatch between the `.c` and `.h`.
+- `e1000_send_packet()` writes `TDT = tx_index`, but the tail register must point *past* the descriptor that was just filled, so the NIC never transmits the packet just queued. Untested, therefore unfixed.
+- `e1000_receive_poll()` consumes a descriptor and then discards the packet.
+- No page-table mapping is done for the BAR address, so this only works while paging is off or identity-mapped.
 
 ### Realtek RTL8139 - `RTL8139/rtl8139.c`
 
 ```c
-bool_t rtl8139_init(void);
+bool_t rtl8139_init(pci_dev_t *pdev);
 void   rtl8139_send_packet(void *data, uint16_t len);
+void   rtl8139_receive_poll(void);
 ```
 
-This is the clearest placeholder in the repository:
+The old body was `nic = (rtl8139_t*)0xDEADBEEF;` followed by a dereference. `rtl8139_init()` now:
 
-```c
-nic = (rtl8139_t*)0xDEADBEEF;
-outb(nic->io_base + RTL_REG_COMMAND, RTL_CMD_RESET);
-```
+- rejects anything that is not vendor `0x10EC` / device `0x8139`;
+- reads BAR0 and requires bit 0 set (an I/O region), rejects `0`, `0xFFFFFFFF` and a zero base, then masks off the two flag bits to get the port base;
+- leaves `nic` NULL on any failure, and `rtl8139_send_packet()` / `rtl8139_receive_poll()` return immediately when it is NULL.
 
-It dereferences a deliberately invalid pointer instead of a PCI BAR, so it would fault immediately. It also uses `RTL_RX_BUFFER_SIZE` and `RTL_REG_COMMAND`, which do not exist (the header defines `RTL_RX_BUF_SIZE` and `RTL_REG_CMD`). The receive functions compute a length and discard it.
+Still missing:
+
+- `rx_buffer` is a plain static array with no 256-byte alignment attribute, which the NIC wants for its 8 KiB receive ring.
+- The receive poll validates the 4-byte header bounds but still does not hand the packet to anything.
+- No EEPROM MAC read, no interrupt, no transmit-status handling.
 
 ## 11. PIT - `Drivers/PIT/`
 

@@ -66,7 +66,7 @@ To re-check the tools at any time without installing anything:
 
 This is the single most confusing part of the project, so read it carefully.
 
-### Layout A - the git repository (what you cloned)
+### Layout A - the git repository (what you cloned) - what the Makefile targets now
 
 ```
 OpenKernel/          <- repository root, Makefile lives here
@@ -83,14 +83,16 @@ OpenKernel/          <- repository root, Makefile lives here
 
 Inside this layout, every path in the `C_SRC` variable of the `Makefile` starts with `OpenKernel/`, for example `OpenKernel/Drivers/Vga/vga.c`. Since the Makefile is already *inside* the `OpenKernel` folder, that path does not resolve. Running `make` here fails with:
 
-```
-make: *** No rule to make target 'build/OpenKernel/Drivers/Vga/vga.o', needed by 'build/os.bin'.  Stop.
+```bash
+make          # produces build/os.bin
 ```
 
-### Layout B - the release package (what the project expects)
+This layout builds end to end. The only remaining link warning is `cannot find entry symbol _start`, because the repository ships no boot code.
+
+### Layout B - the release package - currently does not build
 
 ```
-project/                     <- you run make here
+project/                     <- you would run make here
 ├── Makefile
 ├── link.ld
 ├── notes.txt
@@ -102,7 +104,14 @@ project/                     <- you run make here
     └── ...
 ```
 
-In this layout `OpenKernel/Drivers/Vga/vga.c` resolves correctly, and `-I .` makes the `#include <OpenKernel/...>` style work.
+`.github/workflows/release.yml` still produces exactly this ZIP: it copies the `Makefile` next to an `OpenKernel/` folder, which was the layout the prefixed `C_SRC` paths and `-I .` used to assume.
+
+**The current `Makefile` no longer matches this layout.** Two things break:
+
+- `C_SRC` paths carry no `OpenKernel/` prefix, so `OpenKernel/Drivers/Vga/vga.c` does not exist relative to `project/`.
+- The include path is `-I .`, which points outside `project/` instead of at `project/` itself.
+
+To build the release package, run `make` from inside `project/OpenKernel/`, or restore the prefixed paths and `-I .`. Supporting both layouts at once would need the `Makefile` to detect which one it is in (for example `VPATH := OpenKernel` plus a conditional include directory); that has not been done.
 
 **How to get Layout B:** download a release ZIP from the GitHub Releases page, or build it yourself the way `.github/workflows/release.yml` does:
 
@@ -197,7 +206,7 @@ void kernel_main(void)
 }
 ```
 
-Calling order matters. For example, every VGA print function returns immediately if `vga_init()` has not been called, and `kmalloc()` hands out invalid addresses if `heap_init()` has not been called.
+Calling order matters. For example, every VGA print function returns immediately if `vga_init()` has not been called, and `kmalloc()` returns `NULL` for every request if `heap_init()` has not been called (it does not hand out invalid addresses - it refuses to allocate).
 
 ### Step 4 - Add your own sources
 

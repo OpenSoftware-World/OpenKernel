@@ -2,6 +2,7 @@
 #define RTL8139_H
 
 #include <OpenKernel/SystemLib/Std/types.h>
+#include <OpenKernel/Drivers/PCIBus/pci.h>
 
 #define RTL8139_VENDOR_ID 0x10EC
 #define RTL8139_DEVICE_ID 0x8139
@@ -27,11 +28,12 @@ typedef struct {
     uint32_t rx_offset;
 } rtl8139_t;
 
-bool_t rtl8139_init();
+bool_t rtl8139_init(pci_dev_t *pdev);
 void rtl8139_send_packet(void *data, uint16_t len);
+void rtl8139_receive_poll(void);
 
 #define RTL8139_DRIVER_NAME "OpenKernel Realtek 8139 Driver"
-#define RTL8139_DRIVER_VER "0.2"
+#define RTL8139_DRIVER_VER "0.3"
 #define RTL8139_DRIVER_DESC "A Realtek 8139 driver for OpenKernel"
 #define RTL8139_DRIVER_AUTHOR "OpenSoftware-World"
 #define RTL8139_DRIVER_KRNL_VER "2.0"

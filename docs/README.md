@@ -4,7 +4,7 @@ OpenKernel is a 32-bit x86 operating system kernel project written in C and inte
 
 Read the documents in the numbered order below. Every document has a "previous" and "next" link at the top and bottom so you can move through the set like pages in a book.
 
-> **Before you start:** OpenKernel does not currently compile or boot out of the box. It is a kernel *library* that expects you to supply your own bootloader and entry point, and several source files have known defects. Read [09 - Project Status](09-project-status.md) early if your goal is to get something running.
+> **Before you start:** OpenKernel compiles and links out of the box (`make` produces `build/os.bin`), but it does not boot: it is a kernel *library* that expects you to supply your own bootloader and entry point. Read [09 - Project Status](09-project-status.md) early if your goal is to get something running.
 
 ---
 

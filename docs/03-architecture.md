@@ -127,23 +127,20 @@ LDFLAGS = -m elf_i386 -T link.ld
 ### Source lists
 
 ```make
-ASM_SRC =                     # assembly sources, empty in this repository
+ASM_SRC = OpenKernel/Kernel/Components/InterruptServices/isr.asm
 C_SRC   = OpenKernel/Drivers/Vga/vga.c \
           OpenKernel/Drivers/Cpu/cpu.c \
-          ...                 # 29 entries
+          ...                 # 32 entries
 ```
 
-`ASM_SRC` is empty and there are no `.asm` files anywhere in the tree. This is why no `_start` symbol exists.
+`ASM_SRC` holds `isr.asm`, which builds the CPU exception and IRQ entry stubs. It contains no `_start`, which is why the link still warns `cannot find entry symbol _start`.
 
-`C_SRC` lists 29 of the 31 C files. The two missing entries are:
+`C_SRC` lists 32 of the 34 C files. The two missing entries are:
 
 - `KernelAPI/nonuniversal_api_defs.c`
 - `KernelAPI/OpenKernelUniversalAPI/universal_api_defs.c`
 
-Two listed paths are also wrong regardless of layout:
-
-- `OpenKernel/Drivers/Sound/sb16.c` - the real path is `OpenKernel/Drivers/Sound/sb16/sb16.c`.
-- `OpenKernel/Drivers/Network/rtl8139/rtl8139.c` - the real directory is `RTL8139` (capital letters), which matters on case-sensitive filesystems.
+All paths are relative to the directory the `Makefile` lives in, and `CFLAGS` passes `-I .` so `#include <OpenKernel/...>` resolves. See [02 - Getting Started](02-getting-started.md) section 3 for what this means for the release package layout.
 
 ### Build targets
 

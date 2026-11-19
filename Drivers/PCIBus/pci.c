@@ -1,5 +1,7 @@
 #include "pci.h"
 #include <OpenKernel/SystemLib/SystemIO/io.h>
+#include <OpenKernel/Drivers/Network/e1000/e1000.h>
+#include <OpenKernel/Drivers/Network/RTL8139/rtl8139.h>
 
 #define MAX_PCI_DEV 64
 
@@ -68,17 +70,39 @@ pci_dev_t* pci_get_device(int index) {
     return &pci_devs[index];
 }
 
+/*
+ * Turn on the address decoders a driver is about to use. A BAR is inert until
+ * the matching enable bit in the command register is set, and the e1000 also
+ * needs bus mastering to move its descriptor rings.
+ *
+ * Only the 16-bit command half is written back: the upper half of that dword
+ * is the (write-1-to-clear) status register, which must not be touched.
+ */
+static void pci_enable_device(pci_dev_t *dev) {
+    uint32_t cmd = pci_read(dev->bus, dev->dev, dev->func, 0x04) & 0xFFFFu;
+
+    cmd |= 0x0001;  /* I/O space enable      - RTL8139 */
+    cmd |= 0x0002;  /* memory space enable   - e1000   */
+    cmd |= 0x0004;  /* bus master enable     - e1000   */
+
+    pci_write(dev->bus, dev->dev, dev->func, 0x04, cmd);
+}
+
 void pci_dev_init() {
     for (int i = 0; i < pci_get_dev_count(); i++) {
         pci_dev_t *dev = pci_get_device(i);
 
-        if (dev->class_mod == 0x02) {
-            if (dev->vendor_id == 0x8086) {
-                e1000_init();
-            }
-            if (dev->vendor_id == 0x10EC) {
-                rtl8139_init();
-            }
+        if (!dev || dev->class_mod != 0x02) {
+            continue;
+        }
+
+        if (dev->vendor_id == 0x8086) {
+            pci_enable_device(dev);
+            e1000_init(dev);
+        }
+        else if (dev->vendor_id == 0x10EC) {
+            pci_enable_device(dev);
+            rtl8139_init(dev);
         }
     }
 }

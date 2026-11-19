@@ -40,7 +40,7 @@ void openkernel_universal_api_vga_set_cursor(uint8_t x, uint8_t y);
 void openkernel_universal_api_ptchar(char c);
 void openkernel_universal_api_vga_print_scr_nw(const char *str);
 void openkernel_universal_api_vga_set_color_scheme(uint8_t bg_color, uint8_t text_color);
-void openkernel_universal_api_get_char(void);
+char openkernel_universal_api_get_char(void);
 void openkernel_universal_api_sleep(uint32_t seconds);
 ```
 
@@ -141,10 +141,10 @@ Numbers are defined in `SystemLib/SysCalls/syscall.h`.
 | 10 | `SYSCALL_SET_COLOR_SCH` | 25 | `SYSCALL_EXIT_PROG` | 40 | `SYSCALL_STRCPY` |
 | 11 | `SYSCALL_GET_CHR` | 26 | `SYSCALL_OFS_CREATE_F` | 41 | `SYSCALL_STRNCPY` |
 | 12 | `SYSCALL_SLEEP` | 27 | `SYSCALL_OFS_RF` | 42 | `SYSCALL_PRINT_TIME` |
-| 13 | `SYSCALL_PRINT_HEX` | 28 | `SYSCALL_OFS_WF` | | |
+| 13 | `SYSCALL_PRINT_HEX` | 28 | `SYSCALL_OFS_WF` | 43 | `SYSCALL_SYS_NEXT_STATUS` |
 | 14 | `SYSCALL_PRINT_DEC` | 29 | `SYSCALL_OFS_DF` | | |
 
-Any id outside 0 to 42 returns `-1`.
+Any id outside 0 to 43 returns `-1`.
 
 ### Argument passing
 
@@ -161,51 +161,38 @@ typedef struct { const char* s1, *s2; }       strcmp_t;
 
 Pass a pointer to the struct as `arg`. These are handled correctly by the dispatcher.
 
-Single-value calls take the value directly, but see the warning below.
+Single-value calls follow the same "address of the argument" rule: the wrapper passes `&value` for scalars and `&pointer` for pointer arguments, and `syscall_handler()` dereferences accordingly. `SYSCALL_SYS_NEXT_STATUS` (43) also uses a struct, `sys_next_status_t`, because it carries two arguments.
 
-## 5. Known problems with this layer
-
-These are real defects in the current code, not hypothetical risks.
+## 5. Problems with this layer
 
 ### 5.1 The API sources are not built
 
 Neither `KernelAPI/nonuniversal_api_defs.c` nor `KernelAPI/OpenKernelUniversalAPI/universal_api_defs.c` appears in the `C_SRC` list in the `Makefile`. Nothing else in the repository includes the API headers either. As it stands the layer is **neither compiled nor used**.
 
-To use it, add both files to `C_SRC`.
+To use it, add both files to `C_SRC` with the same path style as the rest of the list.
 
-### 5.2 Scalar arguments are passed as addresses, then cast as values
+### 5.2 Scalar arguments were passed as addresses, then cast as values (fixed)
 
-For example:
+The wrappers have always been uniform - `syscall(id, &arg)` - but `syscall_handler()` used to cast `arg` straight to the value type (`vga_set_bg_color((uint8_t)arg)` received the low byte of the *address*, not the colour). The mismatch affected syscall numbers 0, 4, 5, 8, 9, 12 to 16, 18, 23, 29, 35, 36, 39 and 41 (the earlier revision of this document missed 9, 36 and 39).
 
-```c
-/* universal_api_defs.c */
-void openkernel_universal_api_vga_set_bg_color(uint8_t color) {
-    syscall(4, &color);            /* passes the ADDRESS */
-}
+`syscall_handler()` now dereferences `arg`, so the whole ABI follows one rule:
 
-/* syscall.c */
-case SYSCALL_SET_BG_COLOR:
-    if (!arg) return -1;
-    vga_set_bg_color((uint8_t)arg); /* treats it as the VALUE */
-    return 0;
-```
+- scalar argument: `arg` points to the value (`&value`)
+- pointer argument: `arg` points to the pointer (`&pointer`)
+- multi-field call: `arg` points to a wrapper struct
+- no argument: `arg` is `NULL`
 
-The two sides disagree. The same mismatch affects syscall numbers 4, 5, 8, 11, 12, 13, 14, 15, 16, 18, 23, 29, 35, 37 to 41. Either the wrappers should pass values or the handler should dereference; they cannot both be correct as written.
+This fix also removed the four `cast from pointer to integer of different size` warnings from `syscall.c`.
 
-The struct-based calls (7, 10, 19 to 22, 24 to 28, 32 to 34, 36, 42) do not have this problem.
+### 5.3 Return values were discarded (fixed)
 
-### 5.3 Return values are discarded
+`syscall_handler()` used to end almost every case with `return 0;`, so `openkernel_nonuniversal_api_kmalloc()` could never return a usable pointer, the string helpers always reported `0`, and `SYSCALL_GET_CHR` threw the character away.
 
-`syscall_handler()` ends almost every case with `return 0;`. Consequently:
+Value-returning calls now propagate the result through `syscall()`: `kmalloc`, `memset`, `memcpy` (pointers fit in the `int` return because this is a 32-bit target), `memcmp`, `strcmp`, `strncmp`, `strlen`, the FAT12/16/32 read calls, and `get_char()`. As part of this, `openkernel_universal_api_get_char()` changed from `void` to `char`; it is the only signature change in this fix.
 
-- `openkernel_nonuniversal_api_kmalloc()` can only ever return `0` or `-1`, never a usable pointer.
-- `openkernel_nonuniversal_api_strlen()`, `_strcmp()`, `_strncmp()`, `_memcmp()` always report `0`.
-- `openkernel_nonuniversal_api_fat12_read_file()` and the FAT16/FAT32 equivalents cannot report success or failure.
-- `SYSCALL_GET_CHR` calls `get_char()` and throws the character away.
+### 5.4 One function was declared but never defined (fixed)
 
-### 5.4 One function is declared but never defined
-
-`openkernel_nonuniversal_api_sys_next_status()` appears in `nonuniversal_api_defs.h` but has no implementation in the `.c` file. Any consumer that calls it gets an undefined reference at link time.
+`openkernel_nonuniversal_api_sys_next_status()` appeared in `nonuniversal_api_defs.h` with no implementation. It is now implemented on top of the new `SYSCALL_SYS_NEXT_STATUS` (43) and the `sys_next_status_t` struct, and was verified to deliver both arguments (`mode` and `seconds`) correctly.
 
 ### 5.5 The API previously inherited the `klog_level_t` breakage (resolved)
 
@@ -213,11 +200,10 @@ The struct-based calls (7, 10, 19 to 22, 24 to 28, 32 to 34, 36, 42) do not have
 
 ## 6. Recommended usage pattern
 
-Until the issues above are fixed, the safest approach for a downstream operating system is:
+The argument convention and return-value defects are fixed (section 5); the remaining limitation is 5.1 - the API sources are not in the default build. Until you add them to `C_SRC`, a downstream operating system should:
 
-1. Call OpenKernel's real functions directly (`vga_print_scr_nw()`, `fat16_read_file()`, `ofs_read_file()`) rather than going through `KernelAPI`.
-2. Add `KernelAPI/*.c` to `C_SRC` only after you have verified the argument conventions.
-3. Keep your own thin wrapper layer so you can switch to `KernelAPI` later without touching application code.
+1. Call OpenKernel's real functions directly (`vga_print_scr_nw()`, `fat16_read_file()`, `ofs_read_file()`) rather than going through `KernelAPI`, or add the two `KernelAPI/*.c` files to `C_SRC`.
+2. Keep your own thin wrapper layer so you can switch to `KernelAPI` later without touching application code.
 
 ```c
 /* Your own wrapper - stable for your codebase */

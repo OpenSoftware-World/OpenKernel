@@ -2,6 +2,7 @@
 #include <OpenKernel/Drivers/Vga/vga.h>
 #include <OpenKernel/SystemLib/SystemIO/io.h>
 #include <OpenKernel/Drivers/Cpu/cpu.h>
+#include <OpenKernel/Drivers/PIT/pit.h>
 #include <OpenKernel/SystemLib/TypeConversion/type_conv.h>
 
 systime sys_time = {0, 0, 0, 0, 0, 0};
@@ -71,7 +72,9 @@ void print_time() {
 }
 
 void sleep(uint32_t seconds) {
-    for (uint64_t i = 0; i < (uint64_t)seconds * 50000000ULL; i++) {
-        nop();
-    }
+    const uint32_t max_seconds = 0xFFFFFFFFu / 1000u;
+
+    if (seconds > max_seconds) seconds = max_seconds;
+
+    pit_sleep_ms(seconds * 1000u);
 }

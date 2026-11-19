@@ -85,7 +85,7 @@ sys_next_status("reboot", 0);     /* restart immediately */
 Notes:
 
 - The shutdown path targets QEMU and similar PC firmware. On real hardware the ACPI ports differ and this may do nothing.
-- `seconds` is passed to `sleep()`, which is a busy loop (see [05 - System Library](05-system-library.md)). The delay is approximate and CPU-burning.
+- `seconds` is passed to `sleep()`, which delegates to `pit_sleep_ms()` (see [05 - System Library](05-system-library.md)). It waits on the IRQ0 millisecond counter, so it is accurate to one tick, but it busy-waits rather than suspending anything - and it returns immediately if the PIT has not been initialised or interrupts are off.
 
 ### `exit_program`
 

@@ -1,6 +1,8 @@
 #ifndef VFS_H
 #define VFS_H
 
+#include <OpenKernel/SystemLib/Std/types.h>
+
 typedef enum filesystem_list {
     OFS,
     FAT12,

@@ -16,7 +16,7 @@ Current version: **4.0** (see `version.txt`).
 
 Being precise here saves you a lot of time:
 
-- **It is not a bootable operating system.** The repository contains no assembly files, no multiboot header, no `_start` symbol, and no `kernel_main`. The `link.ld` script declares `ENTRY(_start)`, but nothing defines it. You must supply the entry point.
+- **It is not a bootable operating system.** The repository has one assembly file (`Kernel/Components/InterruptServices/isr.asm`, the interrupt stubs) but no multiboot header, no `_start` symbol and no `kernel_main`. The `link.ld` script declares `ENTRY(_start)`, but nothing defines it, so the link warns `cannot find entry symbol _start`. You must supply the entry point.
 - **It is not a complete kernel.** There is now an IDT with exception/IRQ dispatch, an 8259A PIC remap (`Kernel/Components/InterruptServices/`) and a PIT timer driver (`Drivers/PIT/`, 1 kHz via IRQ0), but there is no GDT, no APIC and no privilege levels. Keyboard and mouse input are polled, not interrupt driven.
 - **It is not a userspace syscall interface.** The `syscall()` function is an ordinary C function call inside the kernel. There is no `int 0x80`, no `sysenter`, and no ring transition.
 - **It is not a general-purpose library for user programs.** Everything runs in kernel context.
@@ -72,13 +72,13 @@ Details are in [03 - Architecture](03-architecture.md).
 
 ## Honest summary of the current state
 
-OpenKernel 4.0 contains roughly 5,300 lines of C across 73 source and header files. Several subsystems work well in isolation (VGA output, CPU control, ATA PIO reads, string and port I/O helpers). Others are partial, and some are placeholders that cannot work as written.
+OpenKernel 4.0 contains roughly 6,800 lines across 34 C files and 46 headers, plus one 79-line assembly file (`isr.asm`). Several subsystems work well in isolation (VGA output, CPU control, ATA PIO reads, string and port I/O helpers). Others are partial, and some are placeholders that cannot work as written.
 
 As of the current repository state:
 
-- The build does not succeed. See [09 - Project Status](09-project-status.md) for the exact blockers.
-- 15 of 31 C files pass a compiler syntax check; 16 do not.
-- There is no entry point, so nothing can be executed even if it compiled.
+- **The build succeeds.** `make` compiles all 34 C files and links `build/os.bin`. See [09 - Project Status](09-project-status.md).
+- All 34 C files pass a compiler syntax check with `-Wall -Wextra`; only two still emit warnings.
+- There is no entry point, so the image cannot be executed even though it links: `_start` is undefined and there is no multiboot header.
 
 Read document 09 before planning any work on this code base.
 
