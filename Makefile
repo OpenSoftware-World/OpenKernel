@@ -62,10 +62,23 @@ C_SRC = OpenKernel/Drivers/Vga/vga.c \
 
 # Obj
 # Specifies where the compiled files will be stored. (Unless you plan to redesign the system from scratch, please do not change this setting.)
-ASM_OBJ = $(ASM_SRC:%.asm=$(BUILD)/%.o)
-C_OBJ = $(C_SRC:%.c=$(BUILD)/%.o)
+# Output file extensions by source folder:
+#   SystemLib -> .lib | Drivers -> .driver | FS & VFS -> .fs
+#   Kernel/Components -> .components | Kernel/KernelServices -> .service
+# Sources outside these folders keep the standard .o extension.
+SYSTEM_LIB_OBJ = $(patsubst OpenKernel/SystemLib/%.c,$(BUILD)/OpenKernel/SystemLib/%.lib,$(filter OpenKernel/SystemLib/%.c,$(C_SRC)))
+DRIVERS_OBJ = $(patsubst OpenKernel/Drivers/%.c,$(BUILD)/OpenKernel/Drivers/%.driver,$(filter OpenKernel/Drivers/%.c,$(C_SRC)))
+FS_VFS_OBJ = $(patsubst OpenKernel/FS/%.c,$(BUILD)/OpenKernel/FS/%.fs,$(filter OpenKernel/FS/%.c,$(C_SRC))) \
+             $(patsubst OpenKernel/VFS/%.c,$(BUILD)/OpenKernel/VFS/%.fs,$(filter OpenKernel/VFS/%.c,$(C_SRC)))
+COMPONENTS_OBJ = $(patsubst OpenKernel/Kernel/Components/%.c,$(BUILD)/OpenKernel/Kernel/Components/%.components,$(filter OpenKernel/Kernel/Components/%.c,$(C_SRC))) \
+                 $(patsubst OpenKernel/Kernel/Components/%.asm,$(BUILD)/OpenKernel/Kernel/Components/%.components,$(filter OpenKernel/Kernel/Components/%.asm,$(ASM_SRC)))
+SERVICES_OBJ = $(patsubst OpenKernel/Kernel/KernelServices/%.c,$(BUILD)/OpenKernel/Kernel/KernelServices/%.service,$(filter OpenKernel/Kernel/KernelServices/%.c,$(C_SRC)))
 
-OBJS = $(ASM_OBJ) $(C_OBJ)
+# Remaining sources outside the special folders keep the standard .o extension.
+ASM_OBJ = $(patsubst %.asm,$(BUILD)/%.o,$(filter-out OpenKernel/Kernel/Components/%.asm,$(ASM_SRC)))
+C_OBJ = $(patsubst %.c,$(BUILD)/%.o,$(filter-out OpenKernel/SystemLib/%.c OpenKernel/Drivers/%.c OpenKernel/FS/%.c OpenKernel/VFS/%.c OpenKernel/Kernel/Components/%.c OpenKernel/Kernel/KernelServices/%.c,$(C_SRC)))
+
+OBJS = $(ASM_OBJ) $(SYSTEM_LIB_OBJ) $(DRIVERS_OBJ) $(FS_VFS_OBJ) $(COMPONENTS_OBJ) $(SERVICES_OBJ) $(C_OBJ)
 
 all: $(KERNEL)
 
@@ -80,9 +93,33 @@ $(BUILD)/%.o: %.asm
 	@mkdir -p $(dir $@)
 	$(AS) -f elf32 $< -o $@
 
+$(BUILD)/%.components: %.asm
+	@mkdir -p $(dir $@)
+	$(AS) -f elf32 $< -o $@
+
 # Compile C
 # It compiles the C files and places them in the corresponding BUILD folder. (You don't need to change this unless you're using a different compiler.)
 $(BUILD)/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/%.lib: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/%.driver: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/%.fs: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/%.components: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/%.service: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
