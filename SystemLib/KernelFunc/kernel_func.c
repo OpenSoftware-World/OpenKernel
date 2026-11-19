@@ -10,7 +10,6 @@ typedef struct {
 
 static kfunc_entry_t ftable[MAX_FUNC];
 static int kfunc_count = 0;
-static int kfunc_s = 0;
 static bool_t kernel_func_enabled = false;
 
 void register_func(const char *name, kfunc_t func) {
