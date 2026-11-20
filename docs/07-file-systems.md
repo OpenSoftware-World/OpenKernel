@@ -9,12 +9,12 @@ OpenKernel ships four file system implementations and one dispatch layer:
 | Component | Path | Capabilities |
 |---|---|---|
 | OFS (Open File System) | `OFS/` | Create, read, write, delete, list |
-| FAT12 | `FAT12/` | Read only |
-| FAT16 | `FAT16/` | Read only |
-| FAT32 | `FAT32/` | Read only |
+| FAT12 | `FAT12/` | Create, read, write, delete, list (root directory) |
+| FAT16 | `FAT16/` | Create, read, write, delete, list (root directory) |
+| FAT32 | `FAT32/` | Create, read, write, delete, list (root or any directory cluster) |
 | VFS | `VFS/` | Selects one active file system |
 
-None of the FAT implementations can write or format. There is no FAT formatter anywhere in the project.
+The FAT drivers can write files but they do not format: there is no FAT formatter anywhere in the project, so the volume still has to be created with host tools such as `mkfs.fat`.
 
 ## 1. OFS - Open File System
 
@@ -104,23 +104,48 @@ Fixed in this revision, kept here so the history is not lost:
 
 All three follow the same design: read the BIOS Parameter Block, locate the FAT and root directory, then walk cluster chains.
 
+Only the BPB parsing is per variant. Everything that does not depend on the entry width lives in the shared core `FATLib/fatlib.c`, which works on a `fatfs_ctx_t` describing the volume:
+
+```c
+typedef struct {
+    fatfs_type_t type;          /* FATFS_TYPE_FAT12 / _FAT16 / _FAT32 */
+    uint32_t fat_start_lba;
+    uint32_t fat_sectors;
+    uint8_t  fat_count;         /* every copy is kept in sync on write */
+    uint32_t root_dir_lba;      /* FAT12/FAT16 fixed root */
+    uint32_t root_dir_sectors;  /* FAT12/FAT16 only, 0 for FAT32 */
+    uint32_t data_start_lba;
+    uint32_t root_cluster;      /* FAT32 root, 0 otherwise */
+    uint16_t bytes_per_sector;  /* 512 once the volume is usable */
+    uint8_t  sectors_per_cluster;
+    uint32_t total_clusters;    /* 0 when the BPB does not say */
+    uint32_t alloc_hint;        /* where the next free-space scan starts */
+} fatfs_ctx_t;
+```
+
+`fat12_fs_t`, `fat16_fs_t` and `fat32_fs_t` now hold the parsed boot sector plus this context; the old `fat_start_lba` / `root_dir_lba` / `data_start_lba` fields were folded into it.
+
 ### Common functions
 
 ```c
 void     fat12_init(uint32_t boot_lba);     /* same shape for fat16, fat32 */
 int      fat12_read_file(const char* file_name, void* buf, uint32_t size);
+bool_t   fat12_create_file(const char* file_name, uint32_t size);
+bool_t   fat12_write_file(const char* file_name, const uint8_t* data, uint32_t size);
+bool_t   fat12_delete_file(const char* file_name);
+uint32_t fat12_get_file_size(const char* file_name);
 uint16_t fat12_get_next_cluster(uint16_t cluster);
-void     fat16_list_root(void);
-void     fat32_list_dir(uint32_t cluster);
+void     fat12_list_root(void);
 ```
+
+`fat16_*` is identical. `fat32_*` uses `uint32_t` clusters and adds `fat32_list_dir(uint32_t cluster)`, which lists an arbitrary directory cluster instead of only the root.
 
 ### How reading works
 
-1. `*_init(boot_lba)` reads the boot sector, parses `reserved_sectors`, FAT count, root entry count, and sectors per cluster, then computes `fat_start_lba`, `root_dir_lba`, and `data_start_lba`.
-2. `*_read_file()` linearly scans the root directory for an exact 11-byte 8.3 filename match.
-3. It follows the cluster chain with `*_get_next_cluster()` and copies each cluster into the caller's buffer.
-
-Cluster chain decoding differs per variant:
+1. `*_init(boot_lba)` reads the boot sector into a sector-sized buffer, validates `bytes_per_sector == 512`, a non-zero `sectors_per_cluster`, `sectors_per_fat` and `fat_count`, then fills the context. A boot sector that fails validation leaves the context *not ready*, so every later call returns without touching the disk rather than dividing by zero.
+2. `fatfs_finalize_geometry()` derives `total_clusters` from the BPB totals and clamps it to what the FAT size and the variant's reserved/bad/EOC marker range can address, so a wrong BPB can only shrink the allocatable space.
+3. `fatfs_read_file()` converts the caller's name to the raw 11-byte 8.3 field, scans the root directory for an exact match, follows the cluster chain and copies each cluster into the caller's buffer. The copy stops at `min(size, file_size)`, so a read can no longer run past the end of the file.
+4. Cluster chain decoding differs per variant:
 
 | Variant | Entry width | Formula |
 |---|---|---|
@@ -128,19 +153,30 @@ Cluster chain decoding differs per variant:
 | FAT16 | 16 bits | index `cluster * 2` |
 | FAT32 | 32 bits, high 4 bits reserved | index `cluster * 4`, mask `0x0FFFFFFF` |
 
+### Writing
+
+All three variants share one implementation:
+
+- **`fatfs_create_file()`** converts the name, refuses it when it already exists, reserves a directory slot, allocates and **zeroes** the cluster chain, then writes an archive entry with `FATFS_DATE_EPOCH` (1980-01-01) in the date fields. A zero-length file gets cluster 0, as the FAT spec requires.
+- **`fatfs_write_file()`** creates the file when it does not exist (the same contract OFS and tFS use), grows the chain when the new size needs more clusters, writes the payload sector by sector, truncates the surplus clusters and finally updates `file_size`. Every partial sector is zero-filled first, so bytes past `file_size` cannot leak stale data from a previous occupant. When the volume is full the old contents are left untouched and `false` is returned.
+- **`fatfs_delete_file()`** frees the whole chain, then marks the entry `0xE5`.
+- **`fatfs_alloc_cluster()`** marks a claimed cluster end-of-chain immediately (no window where it looks free) and resumes each scan from `alloc_hint`, so filling a volume stays linear. `fatfs_fat_set()` writes **every** copy of the FAT, and its read-modify-write path tolerates an entry that straddles a sector boundary.
+- **Names** go through `fatfs_name_to_83()`: `"readme.txt"` becomes `README  TXT`, an already padded 11-byte field with no dot is taken verbatim, and the forbidden 8.3 characters plus control characters are rejected. Names are ASCII only; there is no LFN writer.
+
 ### Limitations of all three
 
-- **Read only.** No write, no create, no delete, no format.
-- **8.3 names only.** Long file name (LFN) entries are not skipped, so a FAT32 directory containing LFN entries will print garbage in `fat32_list_dir()`.
-- **Root directory only** for FAT12 and FAT16 reads. FAT32 can list a subdirectory by cluster but `fat32_read_file()` still targets the root.
-- **Cycle guard.** `fat32_list_dir()` and the root walk in `fat32_read_file()` stop after `FAT_MAX_CLUSTER_STEPS` (65,536) clusters. The per-file data walk terminates on its own because the byte counter strictly increases.
-- **Bounded reads.** Each sector is read into a local 512-byte buffer and only the bytes that still fit are copied, so a `size` that is not a multiple of the sector size can no longer write past the caller's buffer.
-- **Geometry is validated.** `*_init()` reads the boot sector into a sector-sized buffer (the old code read 512 bytes into a 36 / 62 / 90-byte struct and ran hundreds of bytes past it), then requires `bytes_per_sector == 512` and a non-zero `sectors_per_cluster`. Anything else leaves the root directory empty so every lookup misses, instead of dividing by zero later.
+- **Root directory only.** FAT12 and FAT16 cannot create files anywhere else. FAT32 can *list* a subdirectory by cluster (`fat32_list_dir()`), but create/write/delete/read always target the root.
+- **8.3 names only.** No long file name support: LFN entries are skipped on read and never generated on write.
+- **No formatter.** The drivers mount an existing volume; they never write a boot sector.
+- **No timestamps from the clock.** Files get the FAT epoch date (1980-01-01) and midnight as their time, because nothing in the project converts the RTC reading into FAT date/time fields yet.
+- **Cycle guard.** Directory and chain walks stop after `FAT_MAX_CLUSTER_STEPS` (65,536) steps. The per-file data walk terminates on its own because the byte counter strictly increases.
+- **Bounded transfers.** Every sector is read into a local 512-byte buffer and only the bytes that still fit are copied, so a `size` that is not a multiple of the sector size cannot write past the caller's buffer.
+- **Geometry is validated**, but the declared variant is not checked against the cluster count: calling `fat12_init()` on a FAT16 image is still user error and will misread the FAT.
 - `boot_lba` is hard-coded to `0` wherever the VFS calls them.
 
 ### Compile status
 
-All three compile clean with `-Wall -Wextra`. Older revisions of this document listed an `entry[j].filename` typo in `fat12.c`, a missing `fat12_list_root()` declaration, and two calls to the non-existent `ata_read_sector()`; none of those are present any more.
+All four files (`fatlib.c` plus the three drivers) compile clean with `-Wall -Wextra`, and the tree links with no undefined `fatfs_*` symbols. Runtime behaviour has not been executed.
 
 ### Testing a FAT filesystem
 
@@ -161,11 +197,14 @@ Then attach it in QEMU and point `fat16_init(0)` at it.
 A thin dispatch layer over one *globally selected* file system.
 
 ```c
-typedef enum filesystem_list { OFS, FAT12, FAT16, FAT32 } fs_t;
+typedef enum filesystem_list { OFS, FAT12, FAT16, FAT32, tFS } fs_t;
 
 void vfs_init(fs_t fsname);
 void vfs_list(void);
 void vfs_read_file(const char* name, uint8_t* buffer, void* buf, uint32_t size);
+void vfs_create_file(const char* name, uint32_t size);
+void vfs_write_file(const char* name, const uint8_t* data, uint32_t size);
+void vfs_delete_file(const char* name);
 ```
 
 `vfs_init()` stores the choice in a static `current_fs` and calls that file system's `*_init(0)` with a boot LBA of 0. From then on `vfs_list()` and `vfs_read_file()` switch on `current_fs` and forward to the selected implementation.
@@ -198,24 +237,34 @@ void vfs_read_file(const char* name, uint8_t* buffer, void* buf, uint32_t size);
 
 ### Write support
 
-`vfs_create_file()`, `vfs_write_file()` and `vfs_delete_file()` are declared in `vfs.h` and defined in `vfs.c`. They forward to the OFS implementation and are empty `case` branches for FAT12, FAT16 and FAT32 (the source carries a comment saying write support there is planned).
+`vfs_create_file()`, `vfs_write_file()` and `vfs_delete_file()` are declared in `vfs.h` and defined in `vfs.c`. Each of them switches on `current_fs` and forwards to the selected implementation, for OFS, tFS **and** the three FAT variants alike:
 
-They therefore only work when `vfs_init(OFS)` selected OFS. On a FAT file system the calls return without doing anything.
+```c
+vfs_init(FAT16);
+
+vfs_create_file("hello.txt", 64);
+vfs_write_file("hello.txt", (const uint8_t*)"Hello, FAT!", 11);
+
+uint8_t buffer[64];
+vfs_read_file("hello.txt", buffer, buffer, 64);   /* 11 bytes are copied */
+
+vfs_delete_file("hello.txt");
+```
+
+On a FAT volume the calls therefore reach `fat16_create_file()` and friends. The FAT backends are root-directory-only and 8.3-only (see section 2), and none of the three `void` wrappers report failure: a full volume or an invalid name is silently ignored. Use the `fat*_` functions directly when you need the `bool_t` result.
 
 ### Compile status
 
-`vfs.c` and `vfs.h` compile clean. Older revisions reported three problems, none of which remain: `vfs.h` now includes `Std/types.h`, `fat12_list_root()` is declared in `fat12.h`, and `vfs_list()` calls `fat32_list_root()` rather than the `fat32_list_dir(uint32_t cluster)` entry point.
-
-Note that `vfs_read_file()` has no error return path: the return values of the underlying `fat*_read_file()` calls are discarded.
+`vfs.c`, `vfs.h` and the FAT backends compile clean. `vfs_read_file()` still has no error return path: the return values of the underlying `fat*_read_file()` calls are discarded, and `ofs_read_file()` ignores `size` entirely (it has no length parameter).
 
 ## 4. Choosing a file system
 
 | You want | Use | Why |
 |---|---|---|
-| To create and modify files inside your kernel | OFS | It is the only read/write implementation. Remember the fixed 4 KiB per-file slot and the missing buffer-length parameter on read. |
-| To read files from an image made with host tools | FAT12/16/32 | Standard formats you can build with `mkfs.fat`. |
+| A small self-contained volume you format yourself | OFS | It formats a blank disk on first mount. Remember the fixed 4 KiB per-file slot and the missing buffer-length parameter on read. |
+| Files bigger than 4 KiB, or an image built with host tools | FAT12/16/32 | Standard formats you can build with `mkfs.fat`; files are limited by the volume, not by a fixed slot. |
 | A single switch point for your OS code | VFS | Hides which file system is active, at the cost of flexibility. |
-| Subdirectories or files larger than 4 KiB | None of the above | Not supported. You would need to extend OFS or complete the FAT drivers. |
+| Subdirectories you can create through VFS | None of the above | OFS and tFS have no directories, and the FAT drivers only write into the root (FAT32 can *list* a subdirectory by cluster). |
 
 ## 5. How the file systems reach storage
 

@@ -86,13 +86,13 @@ void vfs_create_file(const char *name, uint32_t size) {
             ofs_create_file(name, size);
             break;
         case FAT12:
-            // The ability to create files on a FAT12 drive is not currently available, but I plan to add it in the future.
+            fat12_create_file(name, size);
             break;
         case FAT16:
-            // The ability to create files on a FAT16 drive is not currently available, but I plan to add it in the future.
+            fat16_create_file(name, size);
             break;
         case FAT32:
-            // The ability to create files on a FAT32 drive is not currently available, but I plan to add it in the future.
+            fat32_create_file(name, size);
             break;
         case tFS:
             tfs_create_file(name, size);
@@ -107,13 +107,13 @@ void vfs_write_file(const char *name, const uint8_t* data, uint32_t size) {
             ofs_write_file(name, data, size);
             break;
         case FAT12:
-            // The ability to write files on a FAT12 drive is not currently available, but I plan to add it in the future.
+            fat12_write_file(name, data, size);
             break;
         case FAT16:
-            // The ability to write files on a FAT16 drive is not currently available, but I plan to add it in the future.
+            fat16_write_file(name, data, size);
             break;
         case FAT32:
-            // The ability to write files on a FAT32 drive is not currently available, but I plan to add it in the future.
+            fat32_write_file(name, data, size);
             break;
         case tFS:
             tfs_write_file(name, data, size);
@@ -128,13 +128,13 @@ void vfs_delete_file(const char *fname) {
             ofs_delete_file(fname);
             break;
         case FAT12:
-            // The ability to delete files on a FAT12 drive is not currently available, but I plan to add it in the future.
+            fat12_delete_file(fname);
             break;
         case FAT16:
-            // The ability to delete files on a FAT16 drive is not currently available, but I plan to add it in the future.
+            fat16_delete_file(fname);
             break;
         case FAT32:
-            // The ability to delete files on a FAT32 drive is not currently available, but I plan to add it in the future.
+            fat32_delete_file(fname);
             break;
         case tFS:
             tfs_delete_file(fname);

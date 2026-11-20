@@ -112,8 +112,8 @@ Nothing in this section has been executed. "Works" means "compiles clean and the
 | AHCI driver | Compiles clean with structure asserts and bounded timeouts; untested on hardware. Nothing calls `ahci_init()`, and it stays polled on purpose (see [06 - Drivers](06-drivers.md) section 8) |
 | Serial driver | Compiles clean, IRQ4 driven with TX/RX rings and a polled fallback. 16550 logic is correct and `make run` already passes `-serial stdio`, but it has never been run |
 | Security checker | Compiles clean, all seven checks real; never called, untested at runtime |
-| VFS | Three functions, one global file system, no paths or handles; compiles but `boot_lba` is hard-coded to `0` |
-| FAT12 / FAT16 / FAT32 | Read-only by design, 8.3 names only; all three compile, geometry is validated, reads are bounded. Never executed |
+| VFS | Five functions (`init`, `list`, `read`, `create`/`write`/`delete`), one global file system, no paths or handles; compiles but `boot_lba` is hard-coded to `0` |
+| FAT12 / FAT16 / FAT32 | Read **and** write of root-directory files through the shared `FATLib/fatlib.c` core, 8.3 names only; all four files compile, geometry is validated, transfers are bounded. Never executed |
 | Task manager | Data structures only; no context switch, no preemption. List walks are now bounded and head removal is correct |
 | KernelAPI | Argument convention, return values and the missing `sys_next_status` wrapper are fixed (see [08 - Kernel API](08-kernel-api.md) section 5); still not in the default build |
 | Memory management | Bump allocator with a no-op `kfree`; `heap_init()` is never called, so `kmalloc()` returns NULL today |
@@ -143,8 +143,8 @@ Nothing in this section has been executed. "Works" means "compiles clean and the
 - `printf` or any varargs formatting
 - Free-list memory allocation, memory reclamation, virtual-to-physical mapping API
 - Page fault handling
-- FAT writing or formatting
-- Directory support in OFS, subdirectory reads in FAT12/FAT16
+- Directory support in OFS, subdirectory reads in FAT12/FAT16, and creating subdirectories through the FAT drivers
+- FAT formatting - the FAT drivers mount and write an existing volume, but nothing in the project writes a boot sector
 - A mount table or real VFS abstraction
 - Any network transmit or receive path that reaches real hardware
 - Any automated test suite or CI build job

@@ -2,6 +2,7 @@
 #define FAT12_H
 
 #include <OpenKernel/SystemLib/Std/types.h>
+#include <OpenKernel/FS/FATfs/FATLib/fatlib.h>
 
 #define FAT12_EOC 0x0FF8
 #define FAT12_BAD_CLUSER 0x0FF7
@@ -26,14 +27,16 @@ typedef struct {
 
 typedef struct {
     fat12_boot_sector_t bs;
-    uint32_t fat_start_lba;
-    uint32_t root_dir_lba;
-    uint32_t data_start_lba;
-    uint32_t root_dir_size;
+    /* Layout derived from the boot sector; the shared FAT core works on it. */
+    fatfs_ctx_t ctx;
 } fat12_fs_t;
 
 void fat12_init(uint32_t boot_lba);
 int fat12_read_file(const char* file_name, void* buf, uint32_t size);
+bool_t fat12_create_file(const char* file_name, uint32_t size);
+bool_t fat12_write_file(const char* file_name, const uint8_t* data, uint32_t size);
+bool_t fat12_delete_file(const char* file_name);
+uint32_t fat12_get_file_size(const char* file_name);
 uint16_t fat12_get_next_cluster(uint16_t cluster);
 void fat12_list_root();
 
