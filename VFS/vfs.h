@@ -7,7 +7,8 @@ typedef enum filesystem_list {
     OFS,
     FAT12,
     FAT16,
-    FAT32
+    FAT32,
+    tFS
 } fs_t;
 
 void vfs_init(fs_t fsname);

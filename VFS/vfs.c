@@ -3,6 +3,7 @@
 #include <OpenKernel/FS/FATfs/FAT16/fat16.h>
 #include <OpenKernel/FS/FATfs/FAT32/fat32.h>
 #include <OpenKernel/FS/OFS/ofs.h>
+#include <OpenKernel/FS/tFS/tfs.h>
 
 fs_t current_fs;
 
@@ -29,6 +30,10 @@ void vfs_init(fs_t fsname) {
             fat32_init(0);
             set_fs(FAT32);
             break;
+        case tFS:
+            tfs_init();
+            set_fs(tFS);
+            break;
     }
 }
 
@@ -46,6 +51,9 @@ void vfs_list() {
             break;
         case FAT32:
             fat32_list_root();
+            break;
+        case tFS:
+            tfs_list_files();
             break;
     }
 }
@@ -65,6 +73,9 @@ void vfs_read_file(const char* name, uint8_t* buffer, void* buf, uint32_t size) 
         case FAT32:
             fat32_read_file(name, buf, size);
             break;
+        case tFS:
+            tfs_read_file(name, buffer, size);
+            break;
     }
 }
 
@@ -82,6 +93,9 @@ void vfs_create_file(const char *name, uint32_t size) {
             break;
         case FAT32:
             // The ability to create files on a FAT32 drive is not currently available, but I plan to add it in the future.
+            break;
+        case tFS:
+            tfs_create_file(name, size);
             break;
     }
 }
@@ -101,6 +115,9 @@ void vfs_write_file(const char *name, const uint8_t* data, uint32_t size) {
         case FAT32:
             // The ability to write files on a FAT32 drive is not currently available, but I plan to add it in the future.
             break;
+        case tFS:
+            tfs_write_file(name, data, size);
+            break;
     }
 }
 
@@ -118,6 +135,9 @@ void vfs_delete_file(const char *fname) {
             break;
         case FAT32:
             // The ability to delete files on a FAT32 drive is not currently available, but I plan to add it in the future.
+            break;
+        case tFS:
+            tfs_delete_file(fname);
             break;
     }
 }

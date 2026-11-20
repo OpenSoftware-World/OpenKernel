@@ -31,6 +31,7 @@ C_SRC = OpenKernel/Drivers/Vga/vga.c \
 	    OpenKernel/Drivers/Cpu/cpu.c \
 		OpenKernel/Drivers/PIT/pit.c \
 		OpenKernel/FS/OFS/ofs.c \
+		OpenKernel/FS/tFS/tfs.c \
 		OpenKernel/Drivers/Ahci/ahci.c \
 		OpenKernel/Drivers/Ata/ata.c \
 		OpenKernel/SystemLib/Memory/mem.c \
