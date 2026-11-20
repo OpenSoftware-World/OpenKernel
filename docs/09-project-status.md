@@ -107,10 +107,10 @@ Nothing in this section has been executed. "Works" means "compiles clean and the
 
 | Feature | What is missing or wrong |
 |---|---|
-| Keyboard driver | Ring buffer now works and Caps Lock is handled, but it is polling only, has no IRQ1, no Shift/Alt/Ctrl, and `kbd_init()` is never called |
-| Mouse driver | Works when polled; the duplicate `vgabuffer` that broke the link is gone. No click handling, no IRQ |
-| AHCI driver | Compiles clean with structure asserts and bounded timeouts; untested on hardware. Nothing calls `ahci_init()` |
-| Serial driver | Compiles clean now. 16550 logic is correct and `make run` already passes `-serial stdio`, but it has never been run |
+| Keyboard driver | IRQ1 driven now (ring buffer written by the handler, `get_char()` sleeps in `hlt()`), but still no Shift/Alt/Ctrl and `kbd_init()` is never called |
+| Mouse driver | IRQ12 driven now; the duplicate `vgabuffer` that broke the link is gone. No click handling |
+| AHCI driver | Compiles clean with structure asserts and bounded timeouts; untested on hardware. Nothing calls `ahci_init()`, and it stays polled on purpose (see [06 - Drivers](06-drivers.md) section 8) |
+| Serial driver | Compiles clean, IRQ4 driven with TX/RX rings and a polled fallback. 16550 logic is correct and `make run` already passes `-serial stdio`, but it has never been run |
 | Security checker | Compiles clean, all seven checks real; never called, untested at runtime |
 | VFS | Three functions, one global file system, no paths or handles; compiles but `boot_lba` is hard-coded to `0` |
 | FAT12 / FAT16 / FAT32 | Read-only by design, 8.3 names only; all three compile, geometry is validated, reads are bounded. Never executed |
@@ -118,7 +118,7 @@ Nothing in this section has been executed. "Works" means "compiles clean and the
 | KernelAPI | Argument convention, return values and the missing `sys_next_status` wrapper are fixed (see [08 - Kernel API](08-kernel-api.md) section 5); still not in the default build |
 | Memory management | Bump allocator with a no-op `kfree`; `heap_init()` is never called, so `kmalloc()` returns NULL today |
 | PCI bus | Compiles, scans, decodes BARs and enables the command bits; never executed, so no BAR value has been observed |
-| e1000 / RTL8139 | BAR discovery, device-ID checks and NULL guards are in place; no MAC read, no link setup, no interrupt, never executed |
+| e1000 / RTL8139 | BAR discovery, device-ID checks, NULL guards and an armed PCI interrupt (IMS/IMR + handler) are in place; no MAC read, no link setup, never executed |
 | Time library | `sleep()` now delegates to `pit_sleep_ms()`; returns immediately if the PIT is not running or IF is clear |
 
 ### Stub or placeholder
@@ -127,7 +127,7 @@ Nothing in this section has been executed. "Works" means "compiles clean and the
 |---|---|
 | Ethernet layer | 23 lines of logic, source MAC hard-coded to `0xAA` repeated six times, `ethernet_init()` declared but never defined, transmit always goes to the head of the device list |
 | `kfree()` | Entire body is `(void)ptr;` |
-| `ata_sys_disk_init()` | Empty function body |
+| `ata_sys_disk_init()` | Was an empty body; now hooks IRQ14 and clears nIEN, but nothing in the repository calls it yet |
 | `schedule()` / `yield()` | No context-switch assembly exists; `yield()` restarts the task function instead of resuming it |
 | `qemu_io.h` | Never included by any file |
 | `openkernel_drivers_desc.h`, `openkernel_systemlib_desc.h` | Invalid C at file scope (assignments outside functions), never included, contain typos |
@@ -159,8 +159,8 @@ The project README lists a feature checklist. Here is how it compares with the c
 | Basic CPU control (CLI, HLT, etc.) | Accurate |
 | Kernel service infrastructure | Partial - the code compiles but nothing calls the services |
 | Memory management | Overstated - a bump allocator with a no-op `kfree`, and `heap_init()` is never called |
-| Interrupt handling (IDT) | Accurate - `Kernel/Components/InterruptServices/` provides the IDT, PIC remap and dispatch; no driver registers an IRQ handler yet |
-| Keyboard driver | Partial - polling and a ring buffer work in principle, but there are no modifier keys and `kbd_init()` is never called |
+| Interrupt handling (IDT) | Accurate - `Kernel/Components/InterruptServices/` provides the IDT, PIC remap and dispatch; the handler registry is chained, and PIT, Keyboard, Serial, ATA, Mouse and both network drivers register a handler |
+| Keyboard driver | Partial - IRQ1 driven with a ring buffer, but there are no modifier keys and `kbd_init()` is never called |
 | File system (OFS) | Partial - OFS compiles and now persists its table; it still has no directories and no buffer-length parameter on read |
 | Project structure lists a `Boot/` folder | Inaccurate - there is no `Boot/` directory in the repository |
 | `make` then `make run` | Partial - `make` works; `make iso` needs a `Boot/grub/grub.cfg` that does not exist, and `make run` needs that image first |

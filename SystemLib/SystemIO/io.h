@@ -124,9 +124,12 @@ static inline uint32_t eflags_r(void) {
     return flags;
 }
 
+/* Interrupt enable flag inside RFLAGS (bit 9), as returned by eflags_r(). */
+#define EFLAGS_IF (1u << 9)
+
 #define IO_MODULE_NAME "I/O Library"
 #define IO_MODULE_DESC "I/O Library for OpenKernel"
-#define IO_MODULE_VER "1.1"
+#define IO_MODULE_VER "1.2"
 #define IO_MODULE_AUTHOR "OpenSoftware-World"
 #define IO_MODULE_FILE_NAME "io.lib"
 #define IO_MODULE_KRNL_VER "3.0"

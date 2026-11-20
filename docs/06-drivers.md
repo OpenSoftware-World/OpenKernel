@@ -9,7 +9,7 @@
 Two rules apply to every driver:
 
 1. **You must call the `*_init()` function first.** Most drivers keep an "enabled" flag and silently do nothing until initialisation.
-2. **Almost everything is polled, not interrupt driven.** An IDT, PIC remap and dispatcher exist in `Kernel/Components/InterruptServices/`, and the PIT driver is the only one that registers an IRQ handler (IRQ0) - every other driver still polls.
+2. **Input, timer, serial and disk drivers are interrupt driven.** An IDT, PIC remap and dispatcher live in `Kernel/Components/InterruptServices/`; the dispatcher keeps a *list* of handlers per vector, so devices can share a PCI IRQ line. The PIT (IRQ0), Keyboard (IRQ1), Serial (IRQ4), ATA (IRQ14), Mouse (IRQ12) and the two network cards (PCI interrupt line from config `0x3C`) each register a handler and unmask their line in `*_init()`. AHCI and SB16 still poll - see their sections for why.
 
 ## Driver status overview
 
@@ -18,16 +18,16 @@ Two rules apply to every driver:
 | VGA text mode | `Drivers/Vga/` | Works |
 | CPU control | `Drivers/Cpu/` | Works (partial feature detection) |
 | PIT (8253/8254) | `Drivers/PIT/` | Compiles clean, registers IRQ0, untested on hardware |
-| ATA (PIO) | `Drivers/Ata/` | Works |
-| Keyboard | `Drivers/Keyboard/` | Partial - polling only, ring buffer wired up |
-| Mouse | `Drivers/Mouse/` | Partial - works when polled |
-| Sound Blaster 16 | `Drivers/Sound/sb16/` | Basic but functional |
-| AHCI | `Drivers/Ahci/` | Compiles clean, reworked, untested on hardware |
-| Serial (COM1) | `Drivers/Serial/` | Compiles clean, untested |
-| PCI | `Drivers/PCIBus/` | Compiles clean, untested |
+| ATA (PIO) | `Drivers/Ata/` | Compiles clean; IRQ14 wait with polling fallback, untested |
+| Keyboard | `Drivers/Keyboard/` | IRQ1 driven, ring buffer wired up, no modifier keys |
+| Mouse | `Drivers/Mouse/` | IRQ12 driven, packet assembly in the handler |
+| Sound Blaster 16 | `Drivers/Sound/sb16/` | Basic but functional - stays polled (protocol handshake) |
+| AHCI | `Drivers/Ahci/` | Compiles clean, reworked, untested on hardware - stays polled (see section 8) |
+| Serial (COM1) | `Drivers/Serial/` | IRQ4 driven TX + RX rings with polled fallback, untested |
+| PCI | `Drivers/PCIBus/` | Compiles clean, scans the interrupt line/pin too, untested |
 | Ethernet layer | `Drivers/Network/Ethernet/` | Skeleton, compiles clean |
-| Intel e1000 | `Drivers/Network/e1000/` | Compiles clean, BAR discovery added, untested |
-| Realtek RTL8139 | `Drivers/Network/RTL8139/` | Compiles clean, BAR discovery added, untested |
+| Intel e1000 | `Drivers/Network/e1000/` | PCI interrupt armed (IMS/ICR), RX drained in the handler, untested |
+| Realtek RTL8139 | `Drivers/Network/RTL8139/` | PCI interrupt armed (IMR/ISR), RX drained in the handler, untested |
 
 ## 1. VGA text mode - `Drivers/Vga/`
 
@@ -92,7 +92,7 @@ Limitations:
 
 ## 3. Keyboard - `Drivers/Keyboard/`
 
-PS/2 keyboard on ports `0x60` (data) and `0x64` (status).
+PS/2 keyboard on ports `0x60` (data) and `0x64` (status). **Interrupt driven on IRQ1** (vector 33).
 
 ```c
 void    kbd_init(void);
@@ -102,50 +102,53 @@ void    kbd_hndlr(uint8_t scancode);
 void    kbd_close(void);
 ```
 
-`kbd_hndlr()` ignores break codes, toggles Caps Lock on scancode `0x3A`, maps make codes through a 128-entry US-layout table and pushes the result into a ring buffer (`kbf[KEY_BF_SIZE]` with `buf_head` / `buf_tail`). `get_char()` drains that buffer first and only polls port `0x64` when it is empty; `kb_check()` reports whether anything is pending.
+`kbd_init()` registers `kbd_irq_handler()` for `PIC_IRQ_BASE + KBD_IRQ_LINE` and unmasks IRQ1 (it requires `interrupt_init()` first; registering the same handler twice is a no-op). From then on the handler drains the 8042 output buffer, routes each byte by the auxiliary flag of the status register - a byte without it belongs to the keyboard and goes to `kbd_hndlr()`, an auxiliary byte goes to `mouse_handle_byte()` - and `interrupt_dispatch()` sends the EOI.
+
+`kbd_hndlr()` ignores break codes, toggles Caps Lock on scancode `0x3A`, maps make codes through a 128-entry US-layout table and pushes the result into a ring buffer (`kbf[KEY_BF_SIZE]` with `buf_head` / `buf_tail`, both `volatile` because IRQ1 writes them). `get_char()` drains that buffer and, while it is empty, sleeps in `hlt()` until IRQ1 fills it - with interrupts off it spins instead, because no IRQ can arrive then. `kb_check()` reports whether anything is pending.
 
 Limitations:
 
-- **Polling only.** No IRQ1, so `get_char()` burns CPU while waiting for the controller.
 - **The ring buffer drops characters when full** rather than blocking or evicting.
 - Only the US layout. No Shift, Alt, or Ctrl handling, so symbols requiring Shift never appear correctly.
-- `kbd_init()` is never called anywhere in the repository, so `kbd_enabled_driver` stays false and every entry point returns 0.
+- `get_char()` blocks forever when IRQ1 is masked again (e.g. by `kbd_close()`) while the driver is still enabled.
+- The keyboard and mouse drivers call each other's byte handler because they share one 8042 controller; keep both files in `C_SRC` (or stub the routing) if you remove one of them.
+- `kbd_init()` is never called anywhere in the repository, so `kbd_enabled_driver` stays false and every entry point returns 0 until your `kernel_main()` calls it.
 
 ## 4. Mouse - `Drivers/Mouse/`
 
-PS/2 auxiliary mouse on the same ports.
+PS/2 auxiliary mouse on the same ports. **Interrupt driven on IRQ12** (vector 44).
 
 ```c
 void mouse_init(void);
-void mouse_poll(void);
+void mouse_handle_byte(uint8_t data);   /* one byte from the 8042 */
 void mouse_draw(void);
 void mouse_restore(void);
-void mouse_update(void);     /* poll, then redraw if the position changed */
+void mouse_update(void);                /* redraw if IRQ12 moved the cursor */
 void mouse_close(void);
 ```
 
-`mouse_init()` enables the auxiliary device (`outb(0x64, 0xA8)`), sets bit 1 of the Compaq status byte, sends the default configuration command (`0xF6`) and the enable command (`0xF4`) through the `0xD4` prefix, then drains the buffer.
+`mouse_init()` enables the auxiliary device (`outb(0x64, 0xA8)`), sets bit 1 of the Compaq status byte, sends the default configuration command (`0xF6`) and the enable command (`0xF4`) through the `0xD4` prefix, drains the buffer, registers `mouse_irq_handler()` for IRQ12 and unmasks the line.
 
-`mouse_poll()` assembles the standard 3-byte packet, validates the `bit3` sync bit, updates `mouse_x` / `mouse_y` (Y axis inverted), and clamps the position to the 80x25 screen. `mouse_draw()` writes a block character `0xDB` with attribute `0x1F`; `mouse_restore()` puts back whatever `screen_init()` captured.
+The IRQ handler drains the shared 8042 output buffer and routes every byte by the auxiliary flag: an auxiliary byte goes to `mouse_handle_byte()`, a keyboard byte to `kbd_hndlr()`. `mouse_handle_byte()` assembles the standard 3-byte packet, validates the `bit3` sync bit, updates `mouse_x` / `mouse_y` (Y axis inverted) and clamps the position to the 80x25 screen. `mouse_draw()` writes a block character `0xDB` with attribute `0x1F`; `mouse_restore()` puts back whatever `screen_init()` captured. `mouse_update()` only redraws when the handler has moved the cursor - there is nothing left to poll.
 
 Limitations:
 
-- **No IRQ12.** Everything is polled.
 - Button presses are received as part of the packet but no click handling exists.
 - The cursor is drawn by overwriting VGA cells directly, so it can cover text.
 - `mouse.c` used to declare `extern uint16_t *vgabuffer = (uint16_t *)0xB8000;`, which is a *definition* with an initializer and collided with `vga.c` at link time. It is now a plain `extern` declaration; the definition stays in `vga.c`.
 - `mouse_clear()`, `mouse_put_char()`, and `prev_cell` are declared in the header but never defined.
+- The old `mouse_poll()` entry point is gone: packet assembly happens in the IRQ handler now.
 
 ## 5. Serial - `Drivers/Serial/`
 
-COM1 at `0x3F8`, 38400 baud, 8N1.
+COM1 at `0x3F8`, 38400 baud, 8N1. **Interrupt driven on IRQ4** (vector 36): transmit and receive both go through ring buffers.
 
 ```c
 void serial_init(void);
 int  serial_is_transmit_empty(void);
-void serial_print_char(char c);
+void serial_print_char(char c);           /* queues; IRQ4 drains */
 void serial_print_string(const char *string);   /* converts \n to \r\n */
-char serial_read_char(void);
+char serial_read_char(void);               /* blocks in hlt() on IRQ4 */
 int  serial_received(void);
 int  serial_try_read_char(char *c);
 int  serial_has_error(void);
@@ -155,12 +158,19 @@ void serial_set_status(bool_t val);
 void serial_loopback_test(void);
 ```
 
-`serial_init()` performs the classic 16550 sequence: disable interrupts, set the DLAB bit, program divisor 3 (38400), configure 8N1, enable and clear the FIFO (`0xC7`), set MCR to `0x0B`, run a loopback test writing `0xAE` and reading it back, then leave the modem in normal mode.
+`serial_init()` performs the classic 16550 sequence: disable interrupts, set the DLAB bit, program divisor 3 (38400), configure 8N1, enable and clear the FIFO (`0xC7`), set MCR to `0x0B`, run a loopback test writing `0xAE` and reading it back, then leave the modem in normal mode (`0x0F`, which keeps OUT2 set - the PIC only sees COM1's IRQ with OUT2 high). Finally it writes `0x03` to the IER (received data + THR empty), registers `serial_irq_handler()` for IRQ4 and unmasks the line.
+
+Behaviour worth knowing:
+
+- **The handler reads the interrupt-identification register (IIR)**, which both reports the cause and clears it: a THRE interrupt that is never cleared would leave the UART's INTR line high, starving the next device on a shared IRQ line (and storming a level-triggered PIC). For THR empty it writes the next queued byte; for data-ready / FIFO timeout it empties the UART into the receive ring. `interrupt_dispatch()` sends the EOI.
+- **`serial_print_char()` queues the byte and kicks the transmitter.** While IRQ4 owns the port the kick runs with interrupts off (the handler is the other writer) - without it an idle UART would never produce the edge that starts the transmit chain, and the queue would stall forever on this edge-triggered PIC. When no handler is installed (loopback test failed) it drains the queue to the end with the original blocking wait, so a log line always leaves the port. If the queue is full it makes room with interrupts off and, if the UART accepts nothing at all, drops the byte rather than hanging a log call.
+- **`serial_read_char()` sleeps in `hlt()`** while IRQ4 owns the UART; otherwise it harvests the UART directly, which is the original polled behaviour. `serial_received()` / `serial_try_read_char()` check the ring (and harvest it when no IRQ handler is installed).
+- A failed loopback test leaves `serial_irq_ready` false: the driver then stays fully polled instead of installing an IRQ that cannot work.
 
 Status:
 
-- **Compiles clean.** `serial_read_char()` had been defined twice and line 121 referenced `COMR_MCR`; one definition was removed and the typo corrected. The header's `serial_get_error()` and the source now agree.
-- Never executed. `make run` already passes `-serial stdio`, so output would appear on your terminal as soon as there is a boot path.
+- **Compiles clean.** `serial_read_char()` had been defined twice and line 121 referenced `COMR_MCR`; one definition was removed and the typo corrected. The header's `serial_get_error()` and the source now agree. `serial_loopback_test()` restores MCR to `0x0F` rather than `0x0` now, because dropping OUT2 would silence IRQ4 for good.
+- Never executed at runtime. `make run` already passes `-serial stdio`, so output would appear on your terminal as soon as there is a boot path.
 
 ## 6. Sound Blaster 16 - `Drivers/Sound/sb16/`
 
@@ -191,13 +201,14 @@ void    sb16_test(void);
 Limitations:
 
 - **No DMA and no IRQ.** Only the DMA-less direct-output path is implemented, so buffer sizes are limited and CPU overhead is high.
+- **It stays polled on purpose.** The DSP handshake (`sb16_wait_ready()` before every byte) is part of the Sound Blaster command protocol: the card has no "give me the next byte" interrupt in this mode, only an end-of-transfer IRQ (IRQ5/IRQ7) that nothing in this driver waits for. Converting the handshake would mean polling anyway; a real improvement needs DMA first.
 - `sb16.initialized` is set during init but never checked before playback.
 - No volume control, no stereo, no 16-bit samples.
 - The `Makefile` lists the path as `Drivers/Sound/sb16.c`, but the real file is `Drivers/Sound/sb16/sb16.c`.
 
 ## 7. ATA - `Drivers/Ata/`
 
-PIO mode on the primary channel, ports `0x1F0` to `0x1F7` with the control register at `0x3F6`.
+PIO mode on the primary channel, ports `0x1F0` to `0x1F7` with the control register at `0x3F6`. **Interrupt driven on IRQ14** (vector 46) once `ata_sys_disk_init()` has run.
 
 ```c
 void ata_sys_disk_init(void);
@@ -210,13 +221,20 @@ void ata_identify(uint8_t drive, uint16_t *buf);
 
 Reads and writes are single-sector LBA28 operations: the drive-select register receives `0xE0 | (lba >> 24)` (bit 5 selects LBA mode and bit 4 the drive; the old value `0x0E` was not a valid drive-select word), the sector count is set to 1, the three LBA bytes are written, then command `0x20` (read) or `0x30` (write) is issued and 256 words are transferred over `0x1F0`.
 
+### How the wait works
+
+`ata_sys_disk_init()` clears nIEN in the device control register (so the drive asserts IRQ14 on completion), registers `ata_irq_handler()` for `PIC_IRQ_BASE + ATA_IRQ_LINE` and unmasks IRQ14. The shared wait core then behaves like this:
+
+- **IRQ hooked and interrupts on:** the loop reads the status register once, and if the drive is not ready yet it sleeps in `hlt()` until IRQ14 (or any other interrupt) wakes it. The completion flag is tested with interrupts off and `sti` keeps them masked until after the following `hlt`, so an IRQ landing just before the halt cannot be lost.
+- **IRQ not hooked (`ata_sys_disk_init()` never called) or interrupts off:** the loop busy-waits with the original bounded poll limit - the pre-IRQ behaviour, which is what every file system path gets today because nothing calls `ata_sys_disk_init()` yet.
+- Both modes keep the `ERR` / `DF` abort and the timeout, so a dead drive still returns an error instead of hanging. The IRQ path counts its sleeps (10,000 wake-ups, about 10 s at the default 1 kHz PIT rate), so it needs *some* other interrupt source to wake up - run `pit_init()` alongside it.
+
 Status:
 
-- **Functioning (compile-verified only).** `ata_wait_busy()` and `ata_wait_drq()` poll with a bounded iteration limit and abort on the `ERR` / `DF` status bits, so a dead or absent drive returns instead of hanging the kernel. A short delay after the drive-select write covers the 400 ns settle time the spec requires.
+- **Functioning (compile-verified only).** The wait helpers abort on the `ERR` / `DF` status bits, so a dead or absent drive returns instead of hanging the kernel. A short delay after the drive-select write covers the 400 ns settle time the spec requires.
 - A failed read leaves a zeroed sector in the caller's buffer rather than stack garbage; a failed write leaves the sector on disk untouched.
-- `ata_sys_disk_init()` has an **empty body** - it is a stub.
 - Single sector only, no multi-sector transfers, no DMA, no 48-bit LBA (so no disks above 128 GiB).
-- All three FAT drivers call `ata_sys_disk_read()`, which is the correct name.
+- All three FAT drivers call `ata_sys_disk_read()`, which is the correct name. They still run in polled mode until a boot path calls `ata_sys_disk_init()`.
 
 ## 8. AHCI - `Drivers/Ahci/`
 
@@ -248,7 +266,8 @@ Known limitations:
 
 - **Nothing in the repository calls `ahci_init()`.** It links correctly now that `pci.c` compiles, but nothing invokes it, so it has never run.
 - Untested on real hardware or QEMU: the project has no boot code, so verification so far is compile-time only (structure asserts, clean `-Wall -Wextra` build).
-- No interrupts, no hot-plug, no ATAPI devices, no NCQ; everything is polled with busy-wait timeouts.
+- **No interrupts: `ahci_issue()` polls `CI` with a bounded spin, `configure_port()` keeps `PxIE` at 0 and `ahci_init()` clears `GHC.IE`.** This was left polled deliberately: an AHCI interrupt needs the controller's PCI interrupt line plus a per-port `PxIE` mask, and the default `make run` machine attaches an IDE disk (`-drive ...,if=ide`), not an AHCI controller - so the path could not be exercised. Enabling it means arming `GHC.IE`, setting `PxIE` on each configured port, registering the PCI line captured in `pci_dev_t.interrupt_line`, and waking the command wait from `hlt()` with the same polling fallback ATA uses.
+- No hot-plug, no ATAPI devices, no NCQ.
 
 ## 9. PCI - `Drivers/PCIBus/`
 
@@ -261,7 +280,7 @@ int      pci_get_dev_count(void);
 pci_dev_t* pci_get_device(int index);
 ```
 
-Configuration accesses build the standard address `0x80000000 | bus<<16 | dev<<11 | func<<8 | (offset & 0xFC)` and use ports `0xCF8` / `0xCFC`. `pci_scan()` walks all 256 buses, 32 devices, and reads vendor, device, class, and BAR0 to BAR5.
+Configuration accesses build the standard address `0x80000000 | bus<<16 | dev<<11 | func<<8 | (offset & 0xFC)` and use ports `0xCF8` / `0xCFC`. `pci_scan()` walks all 256 buses, 32 devices, and reads vendor, device, class, BAR0 to BAR5, plus the **Interrupt Line / Interrupt Pin pair at config `0x3C`** - the IRQ the firmware routed the device to, which the e1000 and RTL8139 drivers need to install their handlers (`> 15` means "not connected" and makes those inits fail).
 
 An automatic probe helper `pci_dev_init()` (declared in `pci.h`) detects class `0x02` (network), enables I/O space, memory space and bus mastering in the command register, then matches vendor `0x8086` to `e1000_init(pdev)` and `0x10EC` to `rtl8139_init(pdev)`. Only the 16-bit command half of the dword is written back, so the write-1-to-clear status register above it is not disturbed.
 
@@ -300,46 +319,56 @@ Limitations:
 ```c
 bool_t e1000_init(pci_dev_t *pdev);
 void   e1000_send_packet(void *data, uint16_t len);
-void   e1000_receive_poll(void);
+void   e1000_handle_rx(void);        /* runs from the NIC's IRQ handler */
 ```
 
 TX and RX descriptor rings are allocated and the `TDBAL`, `TDLEN`, `TDH`, `TDT`, `RDBAL`, `RDLEN`, `RDH`, `RDT`, `RCTL`, and `TCTL` registers are programmed. `e1000_init()` now:
 
 - rejects anything that is not vendor `0x8086` with device ID `0x100E` (82540EM) or `0x100F` (82545EM);
 - reads BAR0, rejects an I/O BAR, a `0` BAR and an unimplemented `0xFFFFFFFF` BAR, masks off the four flag bits, and refuses a 64-bit BAR whose high half sits above 4 GiB (this target has only 32-bit pointers);
+- **rejects a device whose Interrupt Line is above 15** (`0xFF` = not connected), because without a routed IRQ there is no interrupt path;
 - checks every `kmalloc()` result, including each 2048-byte receive buffer - a NULL there would make the NIC DMA to physical address 0;
-- resets its own state and returns `false` on any of those failures, so `send` / `receive` become no-ops instead of dereferencing NULL.
+- resets its own state and returns `false` on any of those failures, so `send` / `receive` become no-ops instead of dereferencing NULL;
+- **arms the interrupt last**: `IMC = 0xFFFFFFFF` clears stale causes, `IMS` unmaskes the receive causes (`RXSEQ`, `RXDMT0`, `RXO`, `RXT0`, `RXCFG`), the handler is registered for `PIC_IRQ_BASE + interrupt_line` and the line is unmasked with `pic_clear_mask()`.
+
+`e1000_irq_handler()` reads `ICR` (read-to-clear); a zero value means a device on a shared line raised the interrupt, so it touches nothing and the next handler in the chain gets its turn. Receive causes call `e1000_handle_rx()`, which consumes every filled descriptor in one pass (bounded by the ring size) and then discards the packet.
 
 Still missing:
 
-- No EEPROM or MAC address read, no link setup, no interrupt enable, no receive address filters.
+- No EEPROM or MAC address read, no link setup, no receive address filters.
 - `e1000_send_packet()` writes `TDT = tx_index`, but the tail register must point *past* the descriptor that was just filled, so the NIC never transmits the packet just queued. Untested, therefore unfixed.
-- `e1000_receive_poll()` consumes a descriptor and then discards the packet.
+- The receive path still discards the packet after consuming the descriptor.
 - No page-table mapping is done for the BAR address, so this only works while paging is off or identity-mapped.
+- The ICR cause bits are taken from the 82540EM numbering; which one QEMU raises on packet arrival has not been observed yet.
 
 ### Realtek RTL8139 - `RTL8139/rtl8139.c`
 
 ```c
 bool_t rtl8139_init(pci_dev_t *pdev);
 void   rtl8139_send_packet(void *data, uint16_t len);
-void   rtl8139_receive_poll(void);
+void   rtl8139_handle_rx(void);      /* runs from the NIC's IRQ handler */
 ```
 
 The old body was `nic = (rtl8139_t*)0xDEADBEEF;` followed by a dereference. `rtl8139_init()` now:
 
 - rejects anything that is not vendor `0x10EC` / device `0x8139`;
 - reads BAR0 and requires bit 0 set (an I/O region), rejects `0`, `0xFFFFFFFF` and a zero base, then masks off the two flag bits to get the port base;
-- leaves `nic` NULL on any failure, and `rtl8139_send_packet()` / `rtl8139_receive_poll()` return immediately when it is NULL.
+- **rejects a device whose Interrupt Line is above 15**, for the same reason as the e1000;
+- leaves `nic` NULL on any failure, and `rtl8139_send_packet()` / `rtl8139_handle_rx()` return immediately when it is NULL;
+- **arms the interrupt after the receive ring is programmed**: stale `ISR` bits are cleared, `IMR` unmaskes `RXOK`, `RXERR`, `TXOK` and `RXOVW`, the handler is registered for `PIC_IRQ_BASE + interrupt_line` and the line is unmasked.
+
+`rtl8139_irq_handler()` reads `ISR`; a zero value means another device owns the interrupt on a shared line and nothing is cleared. Otherwise the set bits are written back (write-1-to-clear) and receive causes then drain the ring **until the chip reports it empty** (bounded by `RTL_RX_DRAIN_LIMIT`): one interrupt can cover several queued packets while the ISR bit is cleared only once, and the chip does not re-raise `RXOK` for packets it has already written.
 
 Still missing:
 
 - `rx_buffer` is a plain static array with no 256-byte alignment attribute, which the NIC wants for its 8 KiB receive ring.
-- The receive poll validates the 4-byte header bounds but still does not hand the packet to anything.
-- No EEPROM MAC read, no interrupt, no transmit-status handling.
+- The receive handler validates the 4-byte header bounds but still does not hand the packet to anything.
+- **No ring-overflow recovery**: `RXOVW` is unmasked and acknowledged, but the chip's `CWR` reset is not issued afterwards, so an overflow stops reception until the device is re-initialised.
+- No EEPROM MAC read, no transmit-status handling.
 
 ## 11. PIT - `Drivers/PIT/`
 
-Intel 8253/8254 Programmable Interval Timer. The first driver in the project that uses interrupts instead of polling: it programs channel 0, hooks IRQ0 (vector 32) through `interrupt_register_handler()` and unmasks the line with `pic_clear_mask(0)`.
+Intel 8253/8254 Programmable Interval Timer. The first driver in the project that used interrupts instead of polling, and still the reference for how the others hook their line: it programs channel 0, hooks IRQ0 (vector 32) through `interrupt_register_handler()` and unmasks the line with `pic_clear_mask(0)`. Keyboard, Serial, ATA, Mouse and both network drivers now follow the same pattern on their own lines.
 
 ```c
 void     pit_init(uint32_t hz);       /* 1000 = 1 kHz, one tick per ms */

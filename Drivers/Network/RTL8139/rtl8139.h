@@ -21,6 +21,16 @@
 #define RTL_CMD_TX_ENABLE 0x04
 #define RTL_RX_BUF_SIZE 8192
 
+/* IMR (0x3C) / ISR (0x3E) bits: the events this driver lets interrupt. */
+#define RTL_INT_RXOK   0x0001   /* a good packet is in the receive ring */
+#define RTL_INT_RXERR  0x0002   /* a receive error was reported */
+#define RTL_INT_TXOK   0x0004   /* a transmit completed */
+#define RTL_INT_RXOVW  0x0010   /* the receive ring overflowed */
+
+/* Upper bound on ring-drain rounds inside the IRQ handler: a stuck
+   buffer-empty flag must not trap the handler in interrupt context. */
+#define RTL_RX_DRAIN_LIMIT 256
+
 typedef struct {
     uint32_t io_base;
     uint8_t mac[6];
@@ -30,12 +40,12 @@ typedef struct {
 
 bool_t rtl8139_init(pci_dev_t *pdev);
 void rtl8139_send_packet(void *data, uint16_t len);
-void rtl8139_receive_poll(void);
+void rtl8139_handle_rx(void);
 
 #define RTL8139_DRIVER_NAME "OpenKernel Realtek 8139 Driver"
-#define RTL8139_DRIVER_VER "0.3"
+#define RTL8139_DRIVER_VER "1.0"
 #define RTL8139_DRIVER_DESC "A Realtek 8139 driver for OpenKernel"
 #define RTL8139_DRIVER_AUTHOR "OpenSoftware-World"
-#define RTL8139_DRIVER_KRNL_VER "2.0"
+#define RTL8139_DRIVER_KRNL_VER "4.0"
 
 #endif

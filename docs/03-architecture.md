@@ -36,8 +36,8 @@ OpenKernel/
 │   ├── Vga/                         Text mode 80x25
 │   ├── Cpu/                         CPUID, cli/sti/hlt
 │   ├── PIT/                         8253/8254 interval timer, 1 kHz IRQ0
-│   ├── Keyboard/                    PS/2 polling
-│   ├── Mouse/                       PS/2 polling
+│   ├── Keyboard/                    PS/2 keyboard (IRQ1 driven)
+│   ├── Mouse/                       PS/2 mouse (IRQ12 driven)
 │   ├── Serial/                      COM1 16550
 │   ├── Sound/sb16/                  Sound Blaster 16
 │   ├── Ata/                         PIO mode disk access
@@ -201,7 +201,7 @@ kernel_main (your C code)      the only place where OpenKernel is initialised
    │
    ├── vga_init()              screen output becomes available
    ├── heap_init()             kmalloc becomes usable
-   ├── kbd_init()              keyboard polling enabled
+   ├── kbd_init()              keyboard IRQ1 enabled
    ├── vfs_init(fs) + fs_init  file system ready
    └── your application code
 ```

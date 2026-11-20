@@ -17,7 +17,7 @@ Current version: **4.0** (see `version.txt`).
 Being precise here saves you a lot of time:
 
 - **It is not a bootable operating system.** The repository has one assembly file (`Kernel/Components/InterruptServices/isr.asm`, the interrupt stubs) but no multiboot header, no `_start` symbol and no `kernel_main`. The `link.ld` script declares `ENTRY(_start)`, but nothing defines it, so the link warns `cannot find entry symbol _start`. You must supply the entry point.
-- **It is not a complete kernel.** There is now an IDT with exception/IRQ dispatch, an 8259A PIC remap (`Kernel/Components/InterruptServices/`) and a PIT timer driver (`Drivers/PIT/`, 1 kHz via IRQ0), but there is no GDT, no APIC and no privilege levels. Keyboard and mouse input are polled, not interrupt driven.
+- **It is not a complete kernel.** There is now an IDT with exception/IRQ dispatch, an 8259A PIC remap (`Kernel/Components/InterruptServices/`) and a PIT timer driver (`Drivers/PIT/`, 1 kHz via IRQ0), but there is no GDT, no APIC and no privilege levels. Keyboard (IRQ1), mouse (IRQ12), serial (IRQ4), ATA (IRQ14) and both network cards are interrupt driven; AHCI and SB16 still poll.
 - **It is not a userspace syscall interface.** The `syscall()` function is an ordinary C function call inside the kernel. There is no `int 0x80`, no `sysenter`, and no ring transition.
 - **It is not a general-purpose library for user programs.** Everything runs in kernel context.
 

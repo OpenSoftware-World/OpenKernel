@@ -26,6 +26,28 @@
 
 #define E1000_STATUS 0x0008
 
+/* Interrupt Cause Read (read clears the reported bits), Mask Set and
+   Mask Clear: the e1000's interrupt interface. */
+#define E1000_ICR 0xC0
+#define E1000_IMS 0xD0
+#define E1000_IMC 0xD8
+
+/* ICR/IMS cause bits (82540EM). */
+#define E1000_ICR_TXDW   (1u << 0)    /* transmit descriptor written */
+#define E1000_ICR_TXQE   (1u << 1)    /* transmit queue empty */
+#define E1000_ICR_LSC    (1u << 2)    /* link status change */
+#define E1000_ICR_RXSEQ  (1u << 3)    /* receive sequence error */
+#define E1000_ICR_RXDMT0 (1u << 4)    /* receive descriptor min threshold */
+#define E1000_ICR_RXO    (1u << 6)    /* receive FIFO overrun */
+#define E1000_ICR_RXT0   (1u << 7)    /* receive timer */
+#define E1000_ICR_RXCFG  (1u << 10)   /* receive configuration changed */
+
+/* The causes this driver reacts to: everything that means "descriptors
+   were filled or the receive path needs attention". */
+#define E1000_RX_INTERRUPTS (E1000_ICR_RXSEQ | E1000_ICR_RXDMT0 | \
+                             E1000_ICR_RXO   | E1000_ICR_RXT0   | \
+                             E1000_ICR_RXCFG)
+
 #define E1000_TX_DESC_COUNT 32
 #define E1000_RX_DESC_COUNT 32
 
@@ -59,12 +81,12 @@ typedef struct {
 
 bool_t e1000_init(pci_dev_t *pdev);
 void e1000_send_packet(void *data, uint16_t len);
-void e1000_receive_poll(void);
+void e1000_handle_rx(void);
 
 #define E1000_DRIVER_NAME "OpenKernel Intel E1000 Driver"
-#define E1000_DRIVER_VER "0.3"
+#define E1000_DRIVER_VER "1.0"
 #define E1000_DRIVER_DESC "A Intel E1000 for OpenKernel"
 #define E1000_DRIVER_AUTHOR "OpenSoftware-World"
-#define E1000_DRIVER_KRNL_VER "2.0"
+#define E1000_DRIVER_KRNL_VER "4.0"
 
 #endif

@@ -198,9 +198,9 @@ The first interrupt-handling code in the project: two C modules plus the NASM en
 
 | Function | Purpose |
 |---|---|
-| `interrupt_init(void)` | Installs gates 0-47, runs `pic_init()` and loads the IDTR with `lidt`. IRQ lines stay masked afterwards. |
-| `interrupt_register_handler(vector, handler)` | Attaches a C handler to an exception (0-31) or IRQ vector (32-47). |
-| `interrupt_dispatch(registers_t*)` | Called from `isr.asm`. Exceptions go to their handler or `kernel_panic()`; IRQ handlers run first, then the EOI is sent either way. |
+| `interrupt_init(void)` | Installs gates 0-47, runs `pic_init()`, resets the handler registry and loads the IDTR with `lidt`. IRQ lines stay masked afterwards. Must run before any driver registers a handler. |
+| `interrupt_register_handler(vector, handler)` | Appends a C handler to an exception (0-31) or IRQ vector (32-47). Vectors keep a *list* of handlers (from a fixed 32-node pool, no allocation in interrupt context), so devices sharing a PCI IRQ line can all listen; registering the same function twice is a no-op. |
+| `interrupt_dispatch(registers_t*)` | Called from `isr.asm`. Exceptions run their handler(s) or `kernel_panic()`; for IRQs every registered handler runs in registration order, then the EOI is sent either way. |
 | `pic_init(void)` | ICW1-ICW4 sequence: IRQ0-15 map to vectors 32-47, then every line is masked. |
 | `pic_set_mask(irq)` / `pic_clear_mask(irq)` | Mask or unmask one line (0-15). |
 | `pic_send_eoi(irq)` | Acknowledge the interrupt, including the cascade line for IRQ8-15. |
@@ -212,9 +212,10 @@ The first interrupt-handling code in the project: two C modules plus the NASM en
 ### What it does not do
 
 - **No GDT of its own.** Gates use selector `0x08`, which is whatever the multiboot loader left in CS; there is no GDT code in the repository.
-- **Nothing registers a handler by default.** An unhandled exception panics with the vector mnemonic; an IRQ without a handler is only acknowledged (the EOI is still sent so the controller keeps running).
+- **Nothing registers a handler by default.** An unhandled exception panics with the vector mnemonic; an IRQ without a handler is only acknowledged (the EOI is still sent so the controller keeps running). Drivers that do register: PIT (IRQ0), Keyboard (IRQ1), Serial (IRQ4), ATA (IRQ14), Mouse (IRQ12), e1000 / RTL8139 (their PCI line).
 - **All IRQ lines start masked** - a driver must call `pic_clear_mask()` for the line it wants.
-- No APIC support, no PIT/8254 driver (IRQ0 only fires because QEMU/BIOS leave the PIT running), no per-vector priority, no DPL3 (user) gates and no `int 0x80` syscall gate.
+- No handler *un*registration: once appended to a vector's list a handler stays there (masking the line is how a driver stops it, which is what `pit_stop()`, `kbd_close()` and `mouse_close()` do).
+- No APIC support, no per-vector priority, no DPL3 (user) gates and no `int 0x80` syscall gate.
 - **Nothing in the repository calls `interrupt_init()` yet** - the project still has no boot code.
 
 ### Testing

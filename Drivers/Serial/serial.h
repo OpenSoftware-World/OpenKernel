@@ -5,12 +5,16 @@
 #include <OpenKernel/SystemLib/SystemIO/io.h>
 
 #define COM1_PORT 0x3F8
+#define COM1_IIR (COM1_PORT + 2)     /* read: interrupt identification (clears it) */
 #define COM1_LSR (COM1_PORT + 5)
 #define SERIAL_ERR_OVERRUN 0x02
 #define SERIAL_ERR_PARITY 0x04
 #define SERIAL_ERR_FRAME 0x08
 #define SERIAL_ERROR_FIFO 0x80
 #define COM1_MCR (COM1_PORT + 4)
+
+/* IRQ line COM1 is routed to (vector 36 after the PIC remap). */
+#define SERIAL_IRQ_LINE 4
 
 void serial_init();
 int serial_is_transmit_empty();
@@ -32,9 +36,9 @@ void serial_set_status(bool_t val);
 void serial_loopback_test();
 
 #define SERIAL_DRIVER_NAME "OpenKernel Serial (COM1_PORT) Driver"
-#define SERIAL_DRIVER_VER "0.5"
+#define SERIAL_DRIVER_VER "1.0"
 #define SERIAL_DRIVER_DESC "A Serial (COM1_PORT) driver for OpenKernel"
 #define SERIAL_DRIVER_AUTHOR "OpenSoftware-World"
-#define SERIAL_DRIVER_KRNL_VER "3.0"
+#define SERIAL_DRIVER_KRNL_VER "4.0"
 
 #endif

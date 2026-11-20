@@ -49,6 +49,10 @@ void pci_scan() {
             for (int i = 0; i < 6; i++) {
                 dev.bar[i] = pci_read(bus, device, 0, 0x10 + (i * 4));
             }
+            uint32_t irq_dat = pci_read(bus, device, 0, 0x3C);
+            dev.interrupt_line = (uint8_t)(irq_dat & 0xFF);
+            dev.interrupt_pin = (uint8_t)((irq_dat >> 8) & 0xFF);
+
             pci_add_device(dev);
         }
     }

@@ -46,10 +46,17 @@ STATIC_ASSERT(__builtin_offsetof(registers_t, eip) == 44, registers_eip_offset);
 /*
  * Build the IDT, install the exception/IRQ stubs and remap the PIC.
  * IRQ lines stay masked until a driver unmasks the one it handles.
+ * A fresh handler registry is set up here, so this must run before
+ * anything calls interrupt_register_handler().
  */
 void interrupt_init(void);
 
-/* Install the C handler for an exception (0-31) or IRQ vector (32-47). */
+/*
+ * Append the C handler for an exception (0-31) or IRQ vector (32-47) to
+ * that vector's handler list. Several handlers may share one vector -
+ * which is what a shared PCI IRQ line needs - and they run in
+ * registration order. Registering the same function twice is a no-op.
+ */
 void interrupt_register_handler(uint8_t vector, isr_handler_t handler);
 
 /* Shared entry point called by the isr.asm stubs. */

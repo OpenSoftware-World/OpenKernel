@@ -73,8 +73,40 @@ static void (*const irq_stubs[16])(void) = {
     irq8, irq9, irq10, irq11, irq12, irq13, irq14, irq15
 };
 
+/*
+ * Registered handlers, kept as one linked list per vector. Several devices
+ * can share a PCI IRQ line, and the dispatcher has to call every one of them
+ * so each device gets a chance to acknowledge its interrupt - a single slot
+ * would silently drop the earlier registration. The nodes come from a fixed
+ * pool: the dispatcher runs in interrupt context and must not allocate.
+ */
+typedef struct isr_handler_node {
+    isr_handler_t handler;
+    struct isr_handler_node *next;
+} isr_handler_node_t;
+
+#define ISR_HANDLER_POOL_SIZE 32
+
 static idt_gate_t idt[IDT_ENTRIES];
-static isr_handler_t handlers[IDT_ENTRIES];
+static isr_handler_node_t isr_handler_pool[ISR_HANDLER_POOL_SIZE];
+static isr_handler_node_t *isr_pool_free = NULL;
+static isr_handler_node_t *isr_handlers[IDT_ENTRIES];
+static bool_t isr_pool_ready = false;
+
+/* Thread the pool into a free list. Idempotent: register may be reached
+   before interrupt_init() during a sloppy boot sequence. */
+static void isr_pool_init(void) {
+    uint8_t i;
+
+    if (isr_pool_ready) return;
+
+    for (i = 0; i < ISR_HANDLER_POOL_SIZE - 1; i++)
+        isr_handler_pool[i].next = &isr_handler_pool[i + 1];
+    isr_handler_pool[ISR_HANDLER_POOL_SIZE - 1].next = NULL;
+
+    isr_pool_free = &isr_handler_pool[0];
+    isr_pool_ready = true;
+}
 
 /* CPU exception mnemonics (Intel SDV volume 3, table 6-1). */
 static const char *exception_names[32] = {
@@ -106,12 +138,12 @@ static void idt_set_gate(uint8_t vector, uint32_t handler) {
 }
 
 void interrupt_init(void) {
-    uint8_t i;
+    uint16_t i;
     idtr_t idtr;
 
     /* CPU exceptions 0-31, hardware IRQs 0-15 at vectors 32-47. */
     for (i = 0; i < 32; i++)
-        idt_set_gate(i, (uint32_t)isr_stubs[i]);
+        idt_set_gate((uint8_t)i, (uint32_t)isr_stubs[i]);
     for (i = 0; i < 16; i++)
         idt_set_gate((uint8_t)(PIC_IRQ_BASE + i), (uint32_t)irq_stubs[i]);
 
@@ -121,28 +153,71 @@ void interrupt_init(void) {
      */
     pic_init();
 
+    /* Handler registry: a fresh pool and empty lists for this IDT. */
+    isr_pool_ready = false;
+    isr_pool_init();
+    for (i = 0; i < IDT_ENTRIES; i++)
+        isr_handlers[i] = NULL;
+
     idtr.limit = (uint16_t)(sizeof(idt) - 1);
     idtr.base = (uint32_t)&idt[0];
     __asm__ volatile("lidt %0" : : "m"(idtr));
 }
 
+/*
+ * Append a handler to the vector's list. Registering the same function
+ * twice is a no-op, so a driver init that runs again cannot make the
+ * dispatcher call it twice. When the pool runs out the registration is
+ * dropped - a bounded, non-allocating dispatcher beats a panic here.
+ */
 void interrupt_register_handler(uint8_t vector, isr_handler_t handler) {
-    handlers[vector] = handler;
+    isr_handler_node_t *node;
+    isr_handler_node_t *tail;
+
+    /* vector is a uint8_t and IDT_ENTRIES is 256: every value addresses
+       a real gate, only an empty registration is rejected. */
+    if (handler == NULL) return;
+
+    isr_pool_init();
+
+    for (node = isr_handlers[vector]; node != NULL; node = node->next) {
+        if (node->handler == handler) return;
+    }
+
+    if (isr_pool_free == NULL) return;
+
+    node = isr_pool_free;
+    isr_pool_free = node->next;
+    node->handler = handler;
+    node->next = NULL;
+
+    if (isr_handlers[vector] == NULL) {
+        isr_handlers[vector] = node;
+        return;
+    }
+
+    for (tail = isr_handlers[vector]; tail->next != NULL; tail = tail->next) ;
+    tail->next = node;
 }
 
 void interrupt_dispatch(registers_t *regs) {
     uint32_t vector = regs->vector;
-    isr_handler_t handler = (vector < IDT_ENTRIES) ? handlers[vector] : NULL;
+    isr_handler_node_t *node = (vector < IDT_ENTRIES) ? isr_handlers[vector] : NULL;
 
-    /* CPU exceptions: a registered handler (e.g. a page fault manager)
-       takes the blame, otherwise stop the kernel with a report. */
+    /* CPU exceptions: registered handlers (e.g. a page fault manager)
+       take the blame, otherwise stop the kernel with a report. */
     if (vector < 32) {
-        if (handler != NULL) handler(regs);
-        else kernel_panic("Unhandled CPU exception", exception_names[vector]);
+        if (node != NULL) {
+            for (; node != NULL; node = node->next) node->handler(regs);
+        } else {
+            kernel_panic("Unhandled CPU exception", exception_names[vector]);
+        }
         return;
     }
 
-    if (handler != NULL) handler(regs);
+    /* Every handler on the line runs: on a shared PCI IRQ each device
+       must acknowledge its own interrupt before the EOI is sent. */
+    for (; node != NULL; node = node->next) node->handler(regs);
 
     /* IRQs must be acknowledged even when nobody listens, otherwise the
        controller stops delivering further interrupts. */

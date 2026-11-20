@@ -16,6 +16,8 @@ typedef struct {
     uint8_t subclass;
     uint8_t prog_if;
     uint32_t bar[6];
+    uint8_t interrupt_line;
+    uint8_t interrupt_pin;
 } pci_dev_t;
 
 void pci_init();
@@ -30,9 +32,9 @@ pci_dev_t* pci_get_device(int index);
 void pci_dev_init();
 
 #define PCIBUS_DRIVER_NAME "OpenKernel PCI Bus Driver"
-#define PCIBUS_DRIVER_VER "0.3"
+#define PCIBUS_DRIVER_VER "1.0"
 #define PCIBUS_DRIVER_DESC "A PCI Bus driver for OpenKernel"
 #define PCIBUS_DRIVER_AUTHOR "OpenSoftware-World"
-#define PCIBUS_DRIVER_KRNL_VER "2.0"
+#define PCIBUS_DRIVER_KRNL_VER "4.0"
 
 #endif

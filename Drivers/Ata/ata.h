@@ -29,6 +29,9 @@
 #define ATA_CONTROL 0x3F6
 #define ATA_SRST 0x04
 
+/* IRQ line the primary channel reports command completion on (vector 46). */
+#define ATA_IRQ_LINE 14
+
 void ata_sys_disk_init();
 void ata_sys_disk_read(uint32_t lba, uint8_t* buffer);
 void ata_sys_disk_write(uint32_t lba, const uint8_t* buffer);
@@ -37,9 +40,9 @@ void ata_reinit(uint8_t drive, uint16_t* identify_buf);
 void ata_identify(uint8_t drive, uint16_t* buf);
 
 #define ATA_DRIVER_NAME "OpenKernel ATA Disk Driver"
-#define ATA_DRIVER_VER "0.4"
+#define ATA_DRIVER_VER "1.0"
 #define ATA_DRIVER_DESC "A simple ATA Disk Driver for OpenKernel"
 #define ATA_DRIVER_AUTHOR "OpenSoftware-World"
-#define ATA_DRIVER_KRNL_VER "2.0"
+#define ATA_DRIVER_KRNL_VER "4.0"
 
 #endif
