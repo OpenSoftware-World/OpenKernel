@@ -1,4 +1,6 @@
 #include "mem.h"
+#include <OpenKernel/Drivers/Cpu/cpu.h>
+#include <OpenKernel/SystemLib/SystemIO/io.h>
 
 static uint32_t heap_start;
 static uint32_t heap_end;
@@ -42,22 +44,25 @@ void heap_init(uint32_t start, uint32_t size) {
 }
 
 void* kmalloc(uint32_t size) {
+    uint32_t flags;
+    void* addr;
+
     if (size > 0xFFFFFFFCu) {
         return (void*)0;
     }
 
     size = (size + 3) & ~3u;
+    flags = eflags_r();
+    cli();
 
-    if (heap_current + size < heap_current) {
-        return (void*)0;
+    addr = (void*)0;
+    if (heap_current + size >= heap_current && heap_current + size < heap_end) {
+        addr = (void*)heap_current;
+        heap_current += size;
     }
 
-    if (heap_current + size >= heap_end) {
-        return (void*)0;
-    }
+    if (flags & EFLAGS_IF) sti();
 
-    void* addr = (void*)heap_current;
-    heap_current += size;
     return addr;
 }
 

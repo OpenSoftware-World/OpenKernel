@@ -20,6 +20,7 @@ typedef struct task {
     uint32_t stack_size;
     task_state_t state;
     struct task* next;
+    uint32_t wake_ms;
 } task_t;
 
 void taskmng_init();
@@ -34,10 +35,12 @@ task_t* task_current();
 void task_sleep(uint32_t ms);
 void task_block();
 void task_unblock(task_t* task);
+void task_start();
+void task_exit();
 
 #define TASK_MNG_MODULE_NAME "Task Management Library"
 #define TASK_MNG_MODULE_DESC "Task Management Library for OpenKernel"
-#define TASK_MNG_MODULE_VER "3.0"
+#define TASK_MNG_MODULE_VER "4.0"
 #define TASK_MNG_MODULE_AUTHOR "OpenSoftware-World"
 #define TASK_MNG_MODULE_FILE_NAME "task.lib"
 #define TASK_MNG_MODULE_KRNL_VER "4.0"
