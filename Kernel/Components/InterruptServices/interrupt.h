@@ -46,8 +46,9 @@ STATIC_ASSERT(__builtin_offsetof(registers_t, eip) == 44, registers_eip_offset);
 /*
  * Build the IDT, install the exception/IRQ stubs and remap the PIC.
  * IRQ lines stay masked until a driver unmasks the one it handles.
- * A fresh handler registry is set up here, so this must run before
- * anything calls interrupt_register_handler().
+ * The handler registry is set up here, but registrations made before this
+ * call survive it, so interrupt_init() may run after an early
+ * interrupt_register_handler() without dropping it.
  */
 void interrupt_init(void);
 

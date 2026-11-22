@@ -33,8 +33,12 @@ extern uint8_t _stack_start[], _stack_end[];
  */
 #define TASK_WALK_LIMIT 4096u
 
-/* Smallest stack that still fits the initial frame plus alignment slop. */
-#define TASK_MIN_STACK_SIZE 64u
+/*
+ * Smallest stack a task may be created with. One interrupt frame is already
+ * 64 bytes, and the handler plus its call depth needs room on top of that,
+ * so anything below this would overflow on the very first tick.
+ */
+#define TASK_MIN_STACK_SIZE 1024u
 
 /*
  * Swap the register context of two tasks. This is the only place the CPU
@@ -354,22 +358,34 @@ void task_remove(task_t* task) {
     flags = eflags_r();
     cli();
 
-    prev = task_list;
+    prev = 0;
     cur = task_list;
 
     do {
         if (cur == task) {
-
-            /* Only a single-element list is its own predecessor. The old test
-               compared prev with cur on the first pass, where they are always
-               equal, so removing the head wiped the whole list. */
-            if (task_list->next == task_list) {
+            if (cur->next == cur) {
+                /* Only a single-element list is its own predecessor. */
                 task_list = 0;
+            } else if (cur == task_list) {
+                /*
+                 * Head removal: the tail still links back to it. Relinking
+                 * only task_list (or only prev, which equals the head on the
+                 * first pass and makes prev->next a no-op) leaves the removed
+                 * node reachable through the circle, so the scheduler keeps
+                 * running a task that was supposedly destroyed.
+                 */
+                task_t* tail = task_list;
+                uint32_t tail_guard = 0;
+
+                while (tail->next != task_list) {
+                    tail = tail->next;
+                    if (++tail_guard > TASK_WALK_LIMIT) break;
+                }
+
+                tail->next = cur->next;
+                task_list = cur->next;
             } else {
                 prev->next = cur->next;
-
-                if (task_list == cur)
-                    task_list = cur->next;
             }
 
             break;

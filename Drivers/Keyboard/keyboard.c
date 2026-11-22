@@ -96,10 +96,15 @@ char get_char() {
     /*
      * IRQ1 owns the controller: sleep until it delivers a byte instead of
      * burning CPU on port 0x64. With interrupts off no IRQ can arrive, so
-     * the wait falls back to spinning (same rule as pit_sleep_ms()).
+     * a blocking wait could never end - and enabling them here would
+     * silently change the caller's interrupt state (deadlock risk while
+     * it holds a lock). Return 0 (no byte) instead: same rule as
+     * pit_sleep_ms(), IF clear means the wait cannot progress. Callers
+     * that must block can retry after sti().
      */
     while (buf_head == buf_tail) {
-        if (eflags_r() & EFLAGS_IF) hlt();
+        if (!(eflags_r() & EFLAGS_IF)) return 0;
+        hlt();
     }
 
     char c = kbf[buf_tail];

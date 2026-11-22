@@ -60,7 +60,8 @@ C_SRC = OpenKernel/Drivers/Vga/vga.c \
 		OpenKernel/SystemLib/TaskMng/task.c \
 		OpenKernel/SystemLib/TypeConversion/type_conv.c \
 		OpenKernel/Kernel/Components/InterruptServices/interrupt.c \
-		OpenKernel/Kernel/Components/InterruptServices/pic.c
+		OpenKernel/Kernel/Components/InterruptServices/pic.c \
+		OpenKernel/Kernel/Components/InterruptServices/gdt.c
 
 # Obj
 # Specifies where the compiled files will be stored. (Unless you plan to redesign the system from scratch, please do not change this setting.)

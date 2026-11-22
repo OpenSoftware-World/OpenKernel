@@ -3,8 +3,9 @@
 #include <OpenKernel/Kernel/ErrorHandler/panic.h>
 #include <OpenKernel/Kernel/Components/InterruptServices/interrupt.h>
 #include <OpenKernel/Kernel/Components/InterruptServices/pic.h>
+#include <OpenKernel/Kernel/Components/InterruptServices/gdt.h>
 
-#define KERNEL_CODE_SELECTOR 0x08   /* GDT index 1: kernel code segment */
+#define KERNEL_CODE_SELECTOR GDT_KERNEL_CODE_SELECTOR
 
 /* Entry stubs generated in isr.asm. */
 #define DECLARE_ISR(n) extern void isr##n(void);
@@ -141,6 +142,13 @@ void interrupt_init(void) {
     uint16_t i;
     idtr_t idtr;
 
+    /*
+     * The gates below hard-code selector 0x08 for the kernel code segment.
+     * Install our own GDT first so that selector means what the IDT assumes,
+     * whatever GDT (GRUB's, a bootloader's) is currently loaded.
+     */
+    gdt_init();
+
     /* CPU exceptions 0-31, hardware IRQs 0-15 at vectors 32-47. */
     for (i = 0; i < 32; i++)
         idt_set_gate((uint8_t)i, (uint32_t)isr_stubs[i]);
@@ -153,11 +161,14 @@ void interrupt_init(void) {
      */
     pic_init();
 
-    /* Handler registry: a fresh pool and empty lists for this IDT. */
-    isr_pool_ready = false;
+    /*
+     * Handler registry: thread the pool once, but do NOT clear
+     * isr_handlers[] here. Registrations made before this call are kept -
+     * wiping them would silently drop a handler registered during a sloppy
+     * boot order, and the IRQ line stays unmasked with nobody listening.
+     * The pool is already idempotent, so a repeated init is harmless.
+     */
     isr_pool_init();
-    for (i = 0; i < IDT_ENTRIES; i++)
-        isr_handlers[i] = NULL;
 
     idtr.limit = (uint16_t)(sizeof(idt) - 1);
     idtr.base = (uint32_t)&idt[0];
@@ -201,8 +212,36 @@ void interrupt_register_handler(uint8_t vector, isr_handler_t handler) {
 }
 
 void interrupt_dispatch(registers_t *regs) {
-    uint32_t vector = regs->vector;
-    isr_handler_node_t *node = (vector < IDT_ENTRIES) ? isr_handlers[vector] : NULL;
+    uint32_t vector;
+    isr_handler_node_t *node;
+
+    /*
+     * Repair a frame built by a software INT to an error-code vector
+     * (8, 10-14, 17, 21, 29, 30). The CPU pushes no error code when the
+     * vector is reached through INT n, but the stub in isr.asm assumes one,
+     * so every slot above the vector sits one dword too low. Detect it via
+     * cs: a genuine cs is always a code selector (0x08 kernel, 0x18 user),
+     * while in a short frame that slot holds eflags, which can never be
+     * 0x08 or 0x18 - EFLAGS bit 1 is reserved and always reads 1.
+     *
+     * Shift the slots up one dword, high to low so every source is still
+     * intact when it is read. The frame then matches registers_t, which
+     * also fixes the exit path: isr.asm's `add esp, 8` drops the vector
+     * plus the (now present) dummy error code and iret finds a correct
+     * eip/cs/eflags instead of loading garbage CS and faulting forever.
+     */
+    if (regs->cs != GDT_KERNEL_CODE_SELECTOR &&
+        regs->cs != GDT_USER_CODE_SELECTOR) {
+        regs->ss = regs->useresp;
+        regs->useresp = regs->eflags;
+        regs->eflags = regs->cs;
+        regs->cs = regs->eip;
+        regs->eip = regs->error_code;
+        regs->error_code = 0;
+    }
+
+    vector = regs->vector;
+    node = (vector < IDT_ENTRIES) ? isr_handlers[vector] : NULL;
 
     /* CPU exceptions: registered handlers (e.g. a page fault manager)
        take the blame, otherwise stop the kernel with a report. */

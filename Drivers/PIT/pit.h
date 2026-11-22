@@ -55,7 +55,7 @@ uint32_t pit_get_uptime_ms(void);
 void pit_sleep_ms(uint32_t ms);
 
 #define PIT_DRIVER_NAME "OpenKernel PIT (Programmable Interval Timer) Driver"
-#define PIT_DRIVER_VER "0.1"
+#define PIT_DRIVER_VER "1.2"
 #define PIT_DRIVER_DESC "An Intel 8253/8254 interval timer driver for OpenKernel"
 #define PIT_DRIVER_AUTHOR "OpenSoftware-World"
 #define PIT_DRIVER_KRNL_VER "4.0"

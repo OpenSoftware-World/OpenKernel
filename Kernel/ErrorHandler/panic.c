@@ -8,6 +8,7 @@ How does it work?: First, the screen is completely cleared; then, the cursor is 
 */
 
 void kernel_panic(const char *msg, const char *error_code) {
+    cli();
     vga_clear_screen("F");
     vga_cursor_mode("D", 0, 0);
     vga_set_color_scheme(VGA_COLOR_RED, VGA_COLOR_WHITE);

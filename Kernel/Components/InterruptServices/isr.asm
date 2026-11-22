@@ -42,12 +42,14 @@ isr_common:
     add esp, 8                  ; drop the vector number and the error code
     iret
 
-; Exception stub: the CPU pushes an error code for 8, 10-14 and 17 only,
-; so every other stub pushes a dummy one to keep the frame uniform.
+; Exception stub: the CPU pushes an error code for 8, 10-14, 17, 21, 29
+; and 30 only, so every other stub pushes a dummy one to keep the frame
+; uniform. A software INT to one of those vectors pushes no error code and
+; will misalign the frame - see the note in docs/en/09-project-status.md.
 %macro EXCEPTION_STUB 1
 global isr%1
 isr%1:
-%if ((%1 = 8) || (%1 = 10) || (%1 = 11) || (%1 = 12) || (%1 = 13) || (%1 = 14) || (%1 = 17))
+%if ((%1 = 8) || (%1 = 10) || (%1 = 11) || (%1 = 12) || (%1 = 13) || (%1 = 14) || (%1 = 17) || (%1 = 21) || (%1 = 29) || (%1 = 30))
     push dword %1               ; the error code is already on the stack
 %else
     push dword 0

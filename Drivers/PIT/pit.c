@@ -125,8 +125,10 @@ uint32_t pit_get_uptime_ms(void) {
 /*
  * Busy-wait for ms milliseconds. It cannot run inside an IRQ handler:
  * the ticks it waits for would never be delivered while that handler runs.
- * The wait is driven by pit_ms, so no ms-to-tick conversion (and no 64-bit
- * maths) is needed; the resolution is one tick, 1 ms at the default rate.
+ * With IF clear no tick can arrive either, so there is nothing to wait for
+ * and the call returns immediately (documented behaviour). The wait is
+ * driven by pit_ms, so no ms-to-tick conversion (and no 64-bit maths) is
+ * needed; the resolution is one tick, 1 ms at the default rate.
  */
 void pit_sleep_ms(uint32_t ms) {
     uint32_t start;
@@ -136,10 +138,9 @@ void pit_sleep_ms(uint32_t ms) {
 
     start = pit_ms;
 
-    /* Unsigned subtraction keeps the comparison valid across a wrap. */
+    /* Unsigned subtraction keeps the comparison valid across a wrap. hlt
+       sleeps until the next interrupt; IF is set here, so it always wakes. */
     while ((uint32_t)(pit_ms - start) < ms) {
-        /* hlt sleeps until the next interrupt, but hangs forever when IF
-           is clear - spin in that case. */
         hlt();
     }
 }
