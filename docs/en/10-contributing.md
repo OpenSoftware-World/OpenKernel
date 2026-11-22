@@ -183,7 +183,7 @@ Two related maintenance tasks are worth doing at release time:
 
 ## 7. Documentation
 
-If you change user-visible behaviour, update the relevant file in `docs/`:
+If you change user-visible behaviour, update the relevant file in `docs/en/` (and its translation in `docs/tr/`):
 
 | Change | Update |
 |---|---|
@@ -191,14 +191,14 @@ If you change user-visible behaviour, update the relevant file in `docs/`:
 | Build process or requirements | `02-getting-started.md` |
 | Directory layout or linker script | `03-architecture.md` |
 | Status of a feature | `09-project-status.md` |
-| New documentation file | The reading-order table in `docs/README.md`, plus prev/next links in the adjacent documents |
+| New documentation file | The reading-order table in `docs/en/README.md` and `docs/tr/README.md`, plus prev/next links in the adjacent documents |
 
 Documentation rules used in this set:
 
-- One topic per file, in `docs/`.
-- A main index at `docs/README.md` explaining what each file covers.
+- One topic per file, in `docs/en/`, with its translation in `docs/tr/`.
+- A language index at `docs/README.md`, plus a reading-order index in each language folder (`docs/en/README.md`, `docs/tr/README.md`) explaining what each file covers.
 - Previous and next links at the top and bottom of every document.
-- English, plain language, minimal emoji.
+- English and Turkish, plain language, minimal emoji.
 - Never document a feature that does not exist. If something is broken, say so.
 
 ## 8. License

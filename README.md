@@ -35,16 +35,16 @@ My goal is to make the OpenKernel project truly modern and stable, and to make i
 
 ## 📖 Documentation
 
-A complete documentation set lives in the [`docs/`](docs/) folder. Start at the [documentation index](docs/README.md), which explains what each file covers and gives the recommended reading order.
+A complete documentation set lives in the [`docs/`](docs/) folder, available in [English](docs/en/) and [Türkçe](docs/tr/). Start at the [documentation index](docs/README.md), which explains what each file covers and gives the recommended reading order.
 
 | Start here | |
 |---|---|
-| [Introduction](docs/01-introduction.md) | What OpenKernel is and what it is not |
-| [Getting Started](docs/02-getting-started.md) | Toolchain, setup, bootstrapping, build and run |
-| [Architecture](docs/03-architecture.md) | Directory layout, Makefile, linker script |
-| [Project Status](docs/09-project-status.md) | Honest report of what currently works and what does not |
+| [Introduction](docs/en/01-introduction.md) | What OpenKernel is and what it is not |
+| [Getting Started](docs/en/02-getting-started.md) | Toolchain, setup, bootstrapping, build and run |
+| [Architecture](docs/en/03-architecture.md) | Directory layout, Makefile, linker script |
+| [Project Status](docs/en/09-project-status.md) | Honest report of what currently works and what does not |
 
-> **Note:** In it's current state that is, without the operating system files (e.g., "main.c") this project cannot be compiled; furthermore, you would need to write a bootloader to be able to compile it. (Note: You must write a GRUB-compatible bootloader, rather than a complete, standalone bootloader.) Read [09 - Project Status](docs/09-project-status.md) before you start.
+> **Note:** In it's current state that is, without the operating system files (e.g., "main.c") this project cannot be compiled; furthermore, you would need to write a bootloader to be able to compile it. (Note: You must write a GRUB-compatible bootloader, rather than a complete, standalone bootloader.) Read [09 - Project Status](docs/en/09-project-status.md) before you start.
 
 ## Star History
 
