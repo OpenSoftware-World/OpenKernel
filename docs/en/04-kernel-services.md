@@ -226,9 +226,9 @@ Exercised under QEMU (`-kernel`, multiboot): IDT limit/base via `sidt`, software
 
 ```c
 #define KRNL_NAME        "OpenKernel"
-#define KRNL_VER         "4.0"
+#define KRNL_VER         "5.0"
 #define KRNL_ARCH        "x86 (32-bit)"
-#define KRNL_LAST_COMMIT "960224c"
+#define KRNL_LAST_COMMIT "06c18fe"
 ```
 
 Informational only. No file in the repository includes it, and `KRNL_LAST_COMMIT` is stale compared with the current HEAD.

@@ -162,7 +162,7 @@ Değerli bir katkı, her pull request'te 4. bölümdeki derleme denetimini çal�
 
 Sürümler tamamen `version.txt` tarafından yönetilir.
 
-1. `version.txt` dosyasını yeni sürüm dizesiyle güncelleyin (şu an `4.0`).
+1. `version.txt` dosyasını yeni sürüm dizesiyle güncelleyin (şu an `5.0`).
 2. `main`'e push edin.
 
 Ardından iş akışı:

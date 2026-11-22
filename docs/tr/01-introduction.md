@@ -10,7 +10,7 @@ OpenKernel, 32 bit x86 makineler için çekirdek düzeyinde bir kod tabanıdır.
 
 **Yeniden kullanılmak** üzere tasarlanmıştır. OpenKernel'i bir diske yazıp hazır bir ürün olarak önyüklemezsiniz; bunun yerine onu kendi projenizin içine yerleştirir, kendi önyükleyicinizi ve giriş noktanızı yazar ve işlevlerini kendi çekirdek kodunuzdan çağırırsınız.
 
-Güncel sürüm: **4.0** (bkz. `version.txt`).
+Güncel sürüm: **5.0** (bkz. `version.txt`).
 
 ## OpenKernel ne değildir
 
@@ -72,7 +72,7 @@ Ayrıntılar [03 - Mimari](03-architecture.md) belgesindedir.
 
 ## Güncel durumun dürüst özeti
 
-OpenKernel 4.0, 34 C dosyası ve 46 başlıkta yaklaşık 6.800 satır ile birlikte 79 satırlık tek bir assembly dosyası (`isr.asm`) içerir. Birkaç alt sistem izole olarak iyi çalışır (VGA çıktısı, CPU kontrolü, ATA PIO okumaları, karakter dizisi ve port giriş/çıkışı yardımcıları). Diğerleri kısmidir ve bazıları olduğu gibi çalışamayan yer tutuculardır.
+OpenKernel 5.0, 34 C dosyası ve 46 başlıkta yaklaşık 6.800 satır ile birlikte 79 satırlık tek bir assembly dosyası (`isr.asm`) içerir. Birkaç alt sistem izole olarak iyi çalışır (VGA çıktısı, CPU kontrolü, ATA PIO okumaları, karakter dizisi ve port giriş/çıkışı yardımcıları). Diğerleri kısmidir ve bazıları olduğu gibi çalışamayan yer tutuculardır.
 
 Güncel depo durumu itibarıyla:
 

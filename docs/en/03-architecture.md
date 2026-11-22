@@ -62,7 +62,7 @@ OpenKernel/
 ├── link.ld                          Linker script
 ├── install_pkg.sh                   Host setup (Linux)
 ├── notes.txt                        Bootstrapping instructions
-├── version.txt                      Release version (4.0)
+├── version.txt                      Release version (5.0)
 └── .github/workflows/               Release packaging and CodeQL
 ```
 

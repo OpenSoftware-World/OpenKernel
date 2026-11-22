@@ -289,7 +289,7 @@ Başlıkların çoğu şöyle bir blokla biter:
 #define MEM_MODULE_KRNL_VER "2.0"
 ```
 
-Bu makrolar koda gömülü belgelerdir. Hiçbir mantık bunları okumaz. Bazılarının geçerli 4.0'dan daha eski bir çekirdek sürümü bildirdiğini unutmayın; bu, işlevsel bir sorundan çok bilgi kaymasıdır.
+Bu makrolar koda gömülü belgelerdir. Hiçbir mantık bunları okumaz. Bazılarının geçerli 5.0'dan daha eski bir çekirdek sürümü bildirdiğini unutmayın; bu, işlevsel bir sorundan çok bilgi kaymasıdır.
 
 ---
 
