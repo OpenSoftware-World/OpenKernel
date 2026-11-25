@@ -28,6 +28,7 @@ Two rules apply to every driver:
 | Ethernet layer | `Drivers/Network/Ethernet/` | Skeleton, compiles clean |
 | Intel e1000 | `Drivers/Network/e1000/` | PCI interrupt armed (IMS/ICR), RX drained in the handler, untested |
 | Realtek RTL8139 | `Drivers/Network/RTL8139/` | PCI interrupt armed (IMR/ISR), RX drained in the handler, untested |
+| Framebuffer | `Drivers/Framebuffer/` | Works - bootloader linear FB + VGA mode 13h fallback, verified in QEMU (GRUB multiboot1 and host harness) |
 
 ## 1. VGA text mode - `Drivers/Vga/`
 
@@ -394,6 +395,82 @@ void     pit_sleep_ms(uint32_t ms);   /* busy-wait driven by the ticks */
 - Channel 0 only; channels 1 and 2 (PC speaker, DRAM refresh) are left untouched.
 - No calibration against the RTC, so the crystal error is accepted as is.
 - `pit_get_uptime_ms()` returns `uint32_t` and wraps after roughly 49.7 days.
+
+## 12. Framebuffer - `Drivers/Framebuffer/`
+
+Linear framebuffer graphics with an embedded 8x8 font. The driver attaches to the mode the boot loader already programmed (multiboot1 or multiboot2 linear framebuffer), and falls back to VGA mode 13h (320x200x8) when no loader framebuffer exists, so it works both under GRUB and under QEMU's `-kernel`.
+
+Three source files: `framebuffer.c` (attach, mode parsing, drawing), `framebuffer_vga.c` (mode 13h programming, DAC, vsync, and saving/restoring the text font), `framebuffer_font.c` (the 128-glyph font and text output).
+
+### Functions
+
+```c
+/* acquiring a mode */
+bool_t framebuffer_init(const fb_info_t *info);          /* attach an already-programmed mode */
+bool_t framebuffer_init_from_multiboot1(const void *mb_info);
+bool_t framebuffer_init_from_multiboot2(const void *mb_info);
+bool_t framebuffer_init_from_boot(uint32_t magic, const void *boot_info); /* magic dispatch */
+bool_t framebuffer_init_vga(void);                       /* VGA mode 13h fallback */
+void   framebuffer_close(void);                          /* restore text mode if we own it */
+
+/* state */
+bool_t   framebuffer_is_ready(void);
+uint32_t framebuffer_get_width(void);
+uint32_t framebuffer_get_height(void);
+uint32_t framebuffer_get_pitch(void);     /* bytes per scan line */
+uint8_t  framebuffer_get_bpp(void);
+void    *framebuffer_get_buffer(void);    /* direct pixel access */
+
+/* colour: 0x00RRGGBB, packed through the info bit positions */
+uint32_t framebuffer_rgb(uint8_t r, uint8_t g, uint8_t b);
+void framebuffer_set_palette_entry(uint8_t index, uint8_t r, uint8_t g, uint8_t b);
+void framebuffer_set_palette(const uint8_t *rgb, uint8_t first, uint16_t count);
+
+/* drawing - all clipped to the screen, no-ops when not ready */
+void     framebuffer_clear(uint32_t color);
+void     framebuffer_put_pixel(int32_t x, int32_t y, uint32_t color);
+uint32_t framebuffer_get_pixel(int32_t x, int32_t y);   /* 0 outside the screen */
+void     framebuffer_fill_rect(int32_t x, int32_t y, uint32_t w, uint32_t h, uint32_t color);
+void     framebuffer_draw_rect(int32_t x, int32_t y, uint32_t w, uint32_t h, uint32_t color);
+void     framebuffer_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color);
+void     framebuffer_draw_circle(int32_t cx, int32_t cy, uint32_t radius, uint32_t color);
+void     framebuffer_fill_circle(int32_t cx, int32_t cy, uint32_t radius, uint32_t color);
+void     framebuffer_blit(int32_t x, int32_t y, uint32_t w, uint32_t h,
+                          const void *src, uint32_t src_pitch, uint8_t src_bpp);
+void     framebuffer_scroll_up(uint32_t rows, uint32_t fill_color);
+
+void framebuffer_wait_vsync(void);       /* poll port 0x3DA bit 3 */
+bool_t framebuffer_selftest(void);       /* geometry + round-trip pixel check */
+
+/* text: 8x8 font, scale 1..8, index = char & 0x7F */
+void        framebuffer_set_font(const uint8_t *font);   /* 128 glyphs x 8 bytes */
+const uint8_t *framebuffer_get_font(void);
+void        framebuffer_set_text_scale(uint32_t scale);
+uint32_t    framebuffer_get_text_scale(void);
+void        framebuffer_draw_char(int32_t x, int32_t y, char c, uint32_t fg, uint32_t bg);
+void        framebuffer_draw_string(int32_t x, int32_t y, const char *str, uint32_t fg, uint32_t bg);
+uint32_t    framebuffer_text_width(const char *str);
+```
+
+`FB_COLOR_TRANSPARENT` (bit 24 set) as a background makes `draw_char` / `draw_string` render only the glyph pixels. `FB_MULTIBOOT1_MAGIC` / `FB_MULTIBOOT2_MAGIC` are the loader values `framebuffer_init_from_boot()` dispatches on.
+
+### Behaviour worth knowing
+
+- **`framebuffer_init_from_boot()` is the usual entry point.** It checks the magic, picks the right parser and validates everything the loader reported: size up to 8192, `pitch >= width * bpp / 8`, `bpp` in {8, 15, 16, 24, 32}, non-zero address, and the address below 4 GiB. A text-mode "framebuffer" or a malformed tag is rejected and the function returns false, after which `framebuffer_init_vga()` is the sensible fallback.
+- **Indexed (8 bpp) modes get a 3-3-2 palette** written to the VGA DAC, matching `framebuffer_rgb()`. If the loader supplied its own palette (multiboot1 colour-info block), that palette is loaded instead.
+- **`framebuffer_close()` only restores text mode when this driver owns the video mode.** Attaching a loader-provided framebuffer (address != `0xA0000`) transfers ownership away from the VGA backend, so closing leaves the loader's graphics mode untouched; closing after `framebuffer_init_vga()` reprograms registers, the 64-entry text palette and the CRTC back to BIOS mode 3. Mode 13h stores pixels in all four display planes, which destroys the text font held in plane 2, so `framebuffer_init_vga()` first snapshots that plane (8 KiB, only while the VGA is in text mode) and the restore writes it back - otherwise every glyph would come back as a solid block.
+- Multiboot1's colour block at offset 110 is **six bytes** (`rpos, rsize, gpos, gsize, bpos, bsize` order per spec 0.6.96), not a bitfield - for indexed modes the same bytes are a palette address plus a colour count. Both layouts are parsed from raw bytes through a packed union.
+- All drawing is clipped: coordinates outside the screen are truncated or ignored, and every function is a no-op while the driver is not ready, so callers never need to guard.
+- No heap and no `memcpy` dependency: pixels are stored byte by byte and text glyphs are drawn as run-length spans, so the driver links into any freestanding image.
+- `framebuffer_wait_vsync()` polls the vertical retrace flag; there is no IRQ, so it is a busy wait and is safe to call anywhere.
+
+### Limitations
+
+- Mode 13h is 320x200 with a 4:3 aspect ratio that the driver does not correct; higher resolutions come only from the boot loader.
+- No double buffering or page flipping; tearing is only reduced by calling `framebuffer_wait_vsync()` before a frame.
+- The font is fixed 8x8 and ASCII-only (glyph index `char & 0x7F`); `framebuffer_set_font()` accepts a replacement with the same layout.
+- `framebuffer_blit()` takes the source format as arguments - it does not convert between pixel formats.
+- Untested on real hardware; verified in QEMU against SeaBIOS + GRUB (multiboot1 attach, mode 13h fallback, close/restore) and against a freestanding host harness.
 
 ---
 

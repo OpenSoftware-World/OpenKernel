@@ -5,3 +5,5 @@ Here are the principles:
 - Do not use the standard libraries of the C programming language or libraries built into the system; use only the tools in this folder.
 - Do not add incompatible code.
 - Focus on improving and enhancing the existing architecture rather than making changes that would require a redesign.
+- Communicate in the language the developer uses.
+- Do not modify the “CFLAGS” variable in the Makefile.

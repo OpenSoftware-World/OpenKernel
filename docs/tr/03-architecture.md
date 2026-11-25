@@ -46,6 +46,7 @@ OpenKernel/
 │   ├── Network/Ethernet/            Ethernet frame layer
 │   ├── Network/e1000/               Intel e1000
 │   ├── Network/RTL8139/             Realtek RTL8139
+│   ├── Framebuffer/                 Lineer framebuffer grafiği + 8x8 yazı tipi
 │   └── openkernel_drivers_desc.h    Module metadata (unused)
 │
 ├── KernelAPI/                       Stable API for downstream OSes
@@ -66,17 +67,17 @@ OpenKernel/
 └── .github/workflows/               Release packaging and CodeQL
 ```
 
-Kaba boyut dağılımı (C kaynağı ve başlık dosyaları, toplam yaklaşık 5.350 satır):
+Kaba boyut dağılımı (C kaynağı ve başlık dosyaları, toplam yaklaşık 10.575 satır):
 
 | Alan | Satır | Pay |
 |---|---:|---:|
-| `Drivers/` | 2.158 | %40 |
-| `SystemLib/` | 1.463 | %27 |
-| `Kernel/` | 694 | %13 |
-| `KernelAPI/` | 341 | %6 |
-| Dosya sistemleri (`OFS`, `FAT*`, `VFS`) | 596 | %11 |
+| `Drivers/` | 4.673 | %44 |
+| `SystemLib/` | 1.957 | %19 |
+| `Kernel/` | 1.463 | %14 |
+| `KernelAPI/` | 349 | %3 |
+| Dosya sistemleri (`OFS`, `FAT*`, `tFS`, `VFS`) | 2.133 | %20 |
 
-En büyük tek dosyalar, `Kernel/KernelServices/SecurityChecker/security.c` (602 satır) ve `Drivers/Ahci/ahci.c` (500 satır) dosyalarıdır.
+En büyük tek dosyalar, `FS/FATfs/FATLib/fatlib.c` (936 satır), `Drivers/Framebuffer/framebuffer.c` (685 satır) ve `Kernel/KernelServices/SecurityChecker/security.c` (602 satır) dosyalarıdır.
 
 ## 2. Include kuralı
 
@@ -130,12 +131,12 @@ LDFLAGS = -m elf_i386 -T link.ld
 ASM_SRC = OpenKernel/Kernel/Components/InterruptServices/isr.asm
 C_SRC   = OpenKernel/Drivers/Vga/vga.c \
           OpenKernel/Drivers/Cpu/cpu.c \
-          ...                 # 32 entries
+          ...                 # 38 entries
 ```
 
 `ASM_SRC`, CPU istisna ve IRQ giriş stub'larını oluşturan `isr.asm` dosyasını içerir. İçinde `_start` bulunmadığı için bağlama işlemi hâlâ `cannot find entry symbol _start` uyarısı verir.
 
-`C_SRC`, 34 C dosyasından 32'sini listeler. Eksik olan iki kayıt:
+`C_SRC`, 40 C dosyasından 38'ini listeler. Eksik olan iki kayıt:
 
 - `KernelAPI/nonuniversal_api_defs.c`
 - `KernelAPI/OpenKernelUniversalAPI/universal_api_defs.c`

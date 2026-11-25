@@ -28,6 +28,7 @@ Her sürücü için iki kural geçerlidir:
 | Ethernet katmanı | `Drivers/Network/Ethernet/` | İskelet, hatasız derleniyor |
 | Intel e1000 | `Drivers/Network/e1000/` | PCI kesmesi kuruldu (IMS/ICR), RX işleyicide boşaltılıyor, test edilmedi |
 | Realtek RTL8139 | `Drivers/Network/RTL8139/` | PCI kesmesi kuruldu (IMR/ISR), RX işleyicide boşaltılıyor, test edilmedi |
+| Framebuffer | `Drivers/Framebuffer/` | Çalışıyor - önyükleyici lineer FB + VGA mod 13h yedeği, QEMU'da doğrulandı (GRUB multiboot1 ve host harness) |
 
 ## 1. VGA metin modu - `Drivers/Vga/`
 
@@ -394,6 +395,82 @@ void     pit_sleep_ms(uint32_t ms);   /* busy-wait driven by the ticks */
 - Yalnızca 0. kanal; 1 ve 2. kanallar (PC hoparlörü, DRAM yenilemesi) olduğu gibi bırakılmıştır.
 - RTC'ye karşı kalibrasyon yoktur; dolayısıyla kristal hatası olduğu gibi kabul edilir.
 - `pit_get_uptime_ms()` `uint32_t` döndürür ve yaklaşık 49,7 gün sonra sarar (wrap).
+
+## 12. Framebuffer - `Drivers/Framebuffer/`
+
+Gömülü 8x8 yazı tipiyle lineer framebuffer grafiği. Sürücü, önyükleyicinin zaten programladığı moda bağlanır (multiboot1 veya multiboot2 lineer framebuffer) ve önyükleyici framebuffer'ı yoksa VGA mod 13h'ye (320x200x8) düşer; dolayısıyla hem GRUB hem QEMU'nun `-kernel` modu altında çalışır.
+
+Üç kaynak dosya: `framebuffer.c` (bağlanma, mod ayrıştırma, çizim), `framebuffer_vga.c` (mod 13h programlama, DAC, vsync ve metin yazısının kaydedilip geri yüklenmesi), `framebuffer_font.c` (128 glifli yazı tipi ve metin çıktısı).
+
+### İşlevler
+
+```c
+/* mod edinme */
+bool_t framebuffer_init(const fb_info_t *info);          /* önceden programlanmış moda bağlan */
+bool_t framebuffer_init_from_multiboot1(const void *mb_info);
+bool_t framebuffer_init_from_multiboot2(const void *mb_info);
+bool_t framebuffer_init_from_boot(uint32_t magic, const void *boot_info); /* magic yönlendirme */
+bool_t framebuffer_init_vga(void);                       /* VGA mod 13h yedeği */
+void   framebuffer_close(void);                          /* mod bize aitse metin moduna döner */
+
+/* durum */
+bool_t   framebuffer_is_ready(void);
+uint32_t framebuffer_get_width(void);
+uint32_t framebuffer_get_height(void);
+uint32_t framebuffer_get_pitch(void);     /* satır başına bayt */
+uint8_t  framebuffer_get_bpp(void);
+void    *framebuffer_get_buffer(void);    /* doğrudan piksel erişimi */
+
+/* renk: 0x00RRGGBB, bilgi alanlarındaki bit konumlarına göre paketlenir */
+uint32_t framebuffer_rgb(uint8_t r, uint8_t g, uint8_t b);
+void framebuffer_set_palette_entry(uint8_t index, uint8_t r, uint8_t g, uint8_t b);
+void framebuffer_set_palette(const uint8_t *rgb, uint8_t first, uint16_t count);
+
+/* çizim - hepsi ekrana kırpılır, hazır değilse no-op */
+void     framebuffer_clear(uint32_t color);
+void     framebuffer_put_pixel(int32_t x, int32_t y, uint32_t color);
+uint32_t framebuffer_get_pixel(int32_t x, int32_t y);   /* ekran dışında 0 */
+void     framebuffer_fill_rect(int32_t x, int32_t y, uint32_t w, uint32_t h, uint32_t color);
+void     framebuffer_draw_rect(int32_t x, int32_t y, uint32_t w, uint32_t h, uint32_t color);
+void     framebuffer_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color);
+void     framebuffer_draw_circle(int32_t cx, int32_t cy, uint32_t radius, uint32_t color);
+void     framebuffer_fill_circle(int32_t cx, int32_t cy, uint32_t radius, uint32_t color);
+void     framebuffer_blit(int32_t x, int32_t y, uint32_t w, uint32_t h,
+                          const void *src, uint32_t src_pitch, uint8_t src_bpp);
+void     framebuffer_scroll_up(uint32_t rows, uint32_t fill_color);
+
+void   framebuffer_wait_vsync(void);       /* 0x3DA portundaki bit 3'ü yoklar */
+bool_t framebuffer_selftest(void);         /* geometri + piksel gidip gelme kontrolü */
+
+/* metin: 8x8 yazı tipi, ölçek 1..8, indeks = char & 0x7F */
+void        framebuffer_set_font(const uint8_t *font);   /* 128 glif x 8 bayt */
+const uint8_t *framebuffer_get_font(void);
+void        framebuffer_set_text_scale(uint32_t scale);
+uint32_t    framebuffer_get_text_scale(void);
+void        framebuffer_draw_char(int32_t x, int32_t y, char c, uint32_t fg, uint32_t bg);
+void        framebuffer_draw_string(int32_t x, int32_t y, const char *str, uint32_t fg, uint32_t bg);
+uint32_t    framebuffer_text_width(const char *str);
+```
+
+Arka plan olarak `FB_COLOR_TRANSPARENT` (24. bit açık) verildiğinde `draw_char` / `draw_string` yalnızca glif piksellerini çizer. `FB_MULTIBOOT1_MAGIC` / `FB_MULTIBOOT2_MAGIC`, `framebuffer_init_from_boot()`'un yönlendirdiği önyükleyici değerleridir.
+
+### Bilinmesi gereken davranış
+
+- **Olağan giriş noktası `framebuffer_init_from_boot()`'tur.** Magic'yi kontrol eder, doğru ayrıştırıcıyı seçer ve önyükleyicinin bildirdiği her şeyi doğrular: boyut en fazla 8192, `pitch >= width * bpp / 8`, `bpp` {8, 15, 16, 24, 32} kümesinde, adres sıfır değil ve 4 GiB altında. Metin modunda bir "framebuffer" veya bozuk bir etiket reddedilir ve işlev false döner; ardından `framebuffer_init_vga()` mantıklı yedektir.
+- **İndeksli (8 bpp) modlara `framebuffer_rgb()` ile uyumlu 3-3-2 paleti** VGA DAC'ına yazılır. Önyükleyici kendi paletini sunduysa (multiboot1 renk bilgisi bloğu) onun paleti yüklenir.
+- **`framebuffer_close()` yalnızca video modu bu sürücüye aitse metin moduna geri döner.** Önyükleyicinin sunduğu framebuffer'a bağlanmak (adres != `0xA0000`) VGA arka arkasındaki sahipliği devreder; dolayısıyla kapatmak önyükleyicinin grafik moduna dokunmaz. `framebuffer_init_vga()`'dan sonra kapatmak ise registerları, 64 girişlik metin paletini ve CRTC'yi BIOS mod 3'e programlar. Mod 13h pikselleri dört görüntü plakasının tamamında tutar; bu da plaka 2'deki metin yazısını yok eder. Bu yüzden `framebuffer_init_vga()` önce o plakanın görüntüsünü alır (8 KiB, yalnızca VGA metin modundayken) ve geri yükleme onu geri yazar - aksi halde her glif dolu bir blok olarak geri gelirdi.
+- Multiboot1'de 110. ötelemedeki renk bloğu **altı bayttır** (özet 0.6.96'ya göre `rpos, rsize, gpos, gsize, bpos, bsize` sırası), bir bit alanı değildir - indeksli modlarda aynı baytlar bir palet adresi ve renk sayısıdır. Her iki düzen de paketlenmiş bir birleşim (union) üzerinden ham baytlardan ayrıştırılır.
+- Tüm çizim kırpılır: ekran dışı koordinatlar kesilir ya da yok sayılır ve sürücü hazır değilken her işlev no-op'tur; dolayısıyla çağıran tarafın hiç koruma yazmasına gerek yoktur.
+- Heap ve `memcpy` bağımlılığı yok: pikseller bayt bayt yazılır ve yazı tipi glifleri koşu uzunluğu (run-length) parçaları halinde çizilir; sürücü herhangi bir serbest (freestanding) görüntüye bağlanır.
+- `framebuffer_wait_vsync()` dikey yenileme bayrağını yoklar; kesme yoktur, dolayısıyla meşgul bekledir (busy wait) ve her yerden çağrılabilir.
+
+### Sınırlamalar
+
+- Mod 13h 320x200'dir ve sürücünün düzeltmediği 4:3 en-boy oranına sahiptir; daha yüksek çözünürlükler yalnızca önyükleyiciden gelir.
+- Çift tamponlama veya sayfa çevirme yoktur; yırtılma (tearing) yalnızca kareden önce `framebuffer_wait_vsync()` çağrılırsa azalır.
+- Yazı tipi sabit 8x8 ve yalnızca ASCII'dir (glif indeksi `char & 0x7F`); `framebuffer_set_font()` aynı düzende bir yedek kabul eder.
+- `framebuffer_blit()` kaynak biçimini argüman olarak alır - piksel biçimleri arasında dönüştürme yapmaz.
+- Gerçek donanımda test edilmedi; QEMU'da SeaBIOS + GRUB ile doğrulandı (multiboot1 bağlanma, mod 13h yedeği, kapatma/geri dönüş) ve serbest bir host harness ile.
 
 ---
 

@@ -46,6 +46,7 @@ OpenKernel/
 │   ├── Network/Ethernet/            Ethernet frame layer
 │   ├── Network/e1000/               Intel e1000
 │   ├── Network/RTL8139/             Realtek RTL8139
+│   ├── Framebuffer/                 Linear framebuffer graphics + 8x8 font
 │   └── openkernel_drivers_desc.h    Module metadata (unused)
 │
 ├── KernelAPI/                       Stable API for downstream OSes
@@ -66,17 +67,17 @@ OpenKernel/
 └── .github/workflows/               Release packaging and CodeQL
 ```
 
-Rough size distribution (C source plus headers, about 5,350 lines total):
+Rough size distribution (C source plus headers, about 10,575 lines total):
 
 | Area | Lines | Share |
 |---|---:|---:|
-| `Drivers/` | 2,158 | 40% |
-| `SystemLib/` | 1,463 | 27% |
-| `Kernel/` | 694 | 13% |
-| `KernelAPI/` | 341 | 6% |
-| File systems (`OFS`, `FAT*`, `VFS`) | 596 | 11% |
+| `Drivers/` | 4,673 | 44% |
+| `SystemLib/` | 1,957 | 19% |
+| `Kernel/` | 1,463 | 14% |
+| `KernelAPI/` | 349 | 3% |
+| File systems (`OFS`, `FAT*`, `tFS`, `VFS`) | 2,133 | 20% |
 
-The largest single files are `Kernel/KernelServices/SecurityChecker/security.c` (602 lines) and `Drivers/Ahci/ahci.c` (500 lines).
+The largest single files are `FS/FATfs/FATLib/fatlib.c` (936 lines), `Drivers/Framebuffer/framebuffer.c` (685 lines) and `Kernel/KernelServices/SecurityChecker/security.c` (602 lines).
 
 ## 2. Include convention
 
@@ -130,12 +131,12 @@ LDFLAGS = -m elf_i386 -T link.ld
 ASM_SRC = OpenKernel/Kernel/Components/InterruptServices/isr.asm
 C_SRC   = OpenKernel/Drivers/Vga/vga.c \
           OpenKernel/Drivers/Cpu/cpu.c \
-          ...                 # 32 entries
+          ...                 # 38 entries
 ```
 
 `ASM_SRC` holds `isr.asm`, which builds the CPU exception and IRQ entry stubs. It contains no `_start`, which is why the link still warns `cannot find entry symbol _start`.
 
-`C_SRC` lists 32 of the 34 C files. The two missing entries are:
+`C_SRC` lists 38 of the 40 C files. The two missing entries are:
 
 - `KernelAPI/nonuniversal_api_defs.c`
 - `KernelAPI/OpenKernelUniversalAPI/universal_api_defs.c`

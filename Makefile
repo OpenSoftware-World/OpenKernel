@@ -28,6 +28,9 @@ LDFLAGS = -m elf_i386 -T link.ld
 # You can modify this section as long as you customize OpenKernel to suit your needs. (Don’t forget to include the code files you’ve added here as well.)
 ASM_SRC = OpenKernel/Kernel/Components/InterruptServices/isr.asm
 C_SRC = OpenKernel/Drivers/Vga/vga.c \
+	    OpenKernel/Drivers/Framebuffer/framebuffer.c \
+	    OpenKernel/Drivers/Framebuffer/framebuffer_vga.c \
+	    OpenKernel/Drivers/Framebuffer/framebuffer_font.c \
 	    OpenKernel/Drivers/Cpu/cpu.c \
 		OpenKernel/Drivers/PIT/pit.c \
 		OpenKernel/FS/OFS/ofs.c \

@@ -7,6 +7,7 @@
 #include <OpenKernel/Drivers/Keyboard/keyboard.h>
 #include <OpenKernel/Drivers/Serial/serial.h>
 #include <OpenKernel/Drivers/Vga/vga.h>
+#include <OpenKernel/Drivers/Framebuffer/framebuffer.h>
 #include <OpenKernel/Drivers/Network/e1000/e1000.h>
 #include <OpenKernel/Drivers/Network/Ethernet/ethernet.h>
 #include <OpenKernel/Drivers/Network/RTL8139/rtl8139.h>
@@ -28,6 +29,7 @@ openkernel_drivers_information_t pit_driver;
 openkernel_drivers_information_t keyboard_driver;
 openkernel_drivers_information_t serial_driver;
 openkernel_drivers_information_t vga_driver;
+openkernel_drivers_information_t framebuffer_driver;
 openkernel_drivers_information_t e1000_driver;
 openkernel_drivers_information_t ethernet_driver;
 openkernel_drivers_information_t rtl8139_driver;
@@ -81,6 +83,14 @@ openkernel_drivers_information_t vga_driver = {
     .driver_ver = VGA_DRIVER_VER,
     .driver_author = VGA_DRIVER_AUTHOR,
     .driver_krnl_ver = VGA_DRIVER_KRNL_VER,
+};
+
+openkernel_drivers_information_t framebuffer_driver = {
+    .driver_name = FRAMEBUFFER_DRIVER_NAME,
+    .driver_desc = FRAMEBUFFER_DRIVER_DESC,
+    .driver_ver = FRAMEBUFFER_DRIVER_VER,
+    .driver_author = FRAMEBUFFER_DRIVER_AUTHOR,
+    .driver_krnl_ver = FRAMEBUFFER_DRIVER_KRNL_VER,
 };
 
 openkernel_drivers_information_t e1000_driver = {
