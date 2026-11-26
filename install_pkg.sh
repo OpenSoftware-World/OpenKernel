@@ -49,6 +49,16 @@ GCC_VERSION="${OPENKERNEL_GCC_VERSION:-14.2.0}"
 BINUTILS_VERSION="${OPENKERNEL_BINUTILS_VERSION:-2.43}"
 CROSS_PREFIX="/usr/local"
 WORK_DIR="${OPENKERNEL_CROSS_BUILD_DIR:-/var/tmp/openkernel-cross}"
+# Parallel jobs for the cross-compiler build (build_component uses it)
+JOBS="${OPENKERNEL_BUILD_JOBS:-$(nproc 2>/dev/null || echo 2)}"
+
+# SHA-256 of the official GNU release tarballs, checked before every build.
+# Pinned only for the default versions: overriding OPENKERNEL_*_VERSION
+# turns the check off because the pinned hash would not match anymore.
+GCC_SHA256=""
+BINUTILS_SHA256=""
+if [ "$GCC_VERSION" = "14.2.0" ];   then GCC_SHA256="a7b39bc69cbf9e25826c5a60ab26477001f7c08d85cec04bc0e29cabed6f3cc9"; fi
+if [ "$BINUTILS_VERSION" = "2.43" ]; then BINUTILS_SHA256="b53606f443ac8f01d1d5fc9c39497f2af322d99e14cea5c0b4b124d630379365"; fi
 
 # Make sure locally installed tools (i686-elf-*, grub-mkrescue alias) are found
 export PATH="$CROSS_PREFIX/bin:${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
@@ -138,16 +148,9 @@ AUDIO_PACMAN=(libpulse)
 # ---------------------------------------------------------------------------
 if [ -t 1 ]; then
     C_RESET=$'\033[0m'
-    C_RED=$'\033[31m'
-    C_GREEN=$'\033[32m'
-    C_YELLOW=$'\033[33m'
-    C_BLUE=$'\033[34m'
+    C_RED=$'\033[31m' C_GREEN=$'\033[32m' C_YELLOW=$'\033[33m' C_BLUE=$'\033[34m'
 else
-    C_RESET=""
-    C_RED=""
-    C_GREEN=""
-    C_YELLOW=""
-    C_BLUE=""
+    C_RESET= C_RED= C_GREEN= C_YELLOW= C_BLUE=
 fi
 
 info()    { printf '%sℹ %s%s\n' "$C_BLUE" "$*" "$C_RESET"; }
@@ -155,6 +158,11 @@ success() { printf '%s✔ %s%s\n' "$C_GREEN" "$*" "$C_RESET"; }
 warn()    { printf '%s⚠ %s%s\n' "$C_YELLOW" "$*" "$C_RESET"; }
 error()   { printf '%s✖ %s%s\n' "$C_RED" "$*" "$C_RESET" >&2; }
 die()     { error "$*"; exit 1; }
+
+# Checklist rows; the fixed label width keeps every column aligned
+row_ok()   { printf '  %s✔ %-22s%s %s\n' "$C_GREEN" "$1" "$C_RESET" "$2"; }
+row_bad()  { printf '  %s✖ %-22s%s %s\n' "$C_RED"   "$1" "$C_RESET" "$2"; }
+row_warn() { printf '  %s⚠ %-22s%s %s\n' "$C_YELLOW" "$1" "$C_RESET" "$2"; }
 
 # Reports the failing line and keeps cross-compiler build files for inspection
 on_error() {
@@ -208,12 +216,27 @@ detect_pkg_manager() {
     success "Detected package manager: $PKG"
 }
 
+# Runs one action of the detected package manager; apt always gets a
+# non-interactive frontend so installs and upgrades cannot stop on a prompt.
+pkg_run() {
+    case "$PKG/$1" in
+        apt/update)     DEBIAN_FRONTEND=noninteractive apt-get update ;;
+        dnf/update)     dnf makecache ;;
+        pacman/update)  pacman -Syu --noconfirm ;; # -Syu = refresh + upgrade, no partial upgrade
+        apt/upgrade)    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y ;;
+        dnf/upgrade)    dnf upgrade -y ;;
+        apt/install)    DEBIAN_FRONTEND=noninteractive apt-get install -y "${PACKAGES_APT[@]}" ;;
+        dnf/install)    dnf install -y "${PACKAGES_DNF[@]}" ;;
+        pacman/install) pacman -S --noconfirm --needed "${PACKAGES_PACMAN[@]}" ;;
+        apt/audio)      DEBIAN_FRONTEND=noninteractive apt-get install -y "${AUDIO_APT[@]}" ;;
+        dnf/audio)      dnf install -y "${AUDIO_DNF[@]}" ;;
+        pacman/audio)   pacman -S --noconfirm --needed "${AUDIO_PACMAN[@]}" ;;
+    esac
+}
+
 # Refreshes the package metadata (and optionally upgrades the system)
 update_package_index() {
     if [ "$SKIP_UPDATE" = 1 ]; then
-        if [ "$UPGRADE" = 1 ]; then
-            die "--skip-update and --upgrade cannot be combined."
-        fi
         info "Skipping package list refresh (--skip-update)."
         return 0
     fi
@@ -222,32 +245,18 @@ update_package_index() {
         # Refresh and upgrade in one step: installing right after a bare -Sy
         # would leave Arch in an unsupported "partial upgrade" state.
         info "Refreshing package lists and upgrading the system (pacman)..."
-        pacman -Syu --noconfirm
+        pkg_run update
         success "Package lists refreshed and system upgraded"
         return 0
     fi
 
     info "Refreshing package lists..."
-    case "$PKG" in
-        apt)
-            apt-get update
-            ;;
-        dnf)
-            dnf makecache
-            ;;
-    esac
+    pkg_run update
     success "Package lists refreshed"
 
     if [ "$UPGRADE" = 1 ]; then
         info "Upgrading the system..."
-        case "$PKG" in
-            apt)
-                apt-get upgrade -y
-                ;;
-            dnf)
-                dnf upgrade -y
-                ;;
-        esac
+        pkg_run upgrade
         success "System upgraded"
     fi
 }
@@ -255,17 +264,7 @@ update_package_index() {
 # Installs the packages required by the Makefile and the cross build
 install_packages() {
     info "Installing packages..."
-    case "$PKG" in
-        apt)
-            DEBIAN_FRONTEND=noninteractive apt-get install -y "${PACKAGES_APT[@]}"
-            ;;
-        dnf)
-            dnf install -y "${PACKAGES_DNF[@]}"
-            ;;
-        pacman)
-            pacman -S --noconfirm --needed "${PACKAGES_PACMAN[@]}"
-            ;;
-    esac
+    pkg_run install
     success "Packages installed"
 }
 
@@ -273,20 +272,8 @@ install_packages() {
 # Best effort: a conflict with PipeWire must not abort the whole setup.
 install_audio_support() {
     info "Installing PulseAudio client library (QEMU '-audiodev pa')..."
-    case "$PKG" in
-        apt)
-            DEBIAN_FRONTEND=noninteractive apt-get install -y "${AUDIO_APT[@]}" ||
-                warn "PulseAudio package could not be installed; 'make run' audio may not work."
-            ;;
-        dnf)
-            dnf install -y "${AUDIO_DNF[@]}" ||
-                warn "PulseAudio package could not be installed; 'make run' audio may not work."
-            ;;
-        pacman)
-            pacman -S --noconfirm --needed "${AUDIO_PACMAN[@]}" ||
-                warn "PulseAudio package could not be installed; 'make run' audio may not work."
-            ;;
-    esac
+    pkg_run audio ||
+        warn "PulseAudio package could not be installed; 'make run' audio may not work."
 }
 
 # Fedora ships the tool as grub2-mkrescue, but the Makefile calls grub-mkrescue
@@ -303,18 +290,26 @@ ensure_grub_mkrescue() {
     warn "grub-mkrescue was not found; 'make iso' will fail."
 }
 
-# Downloads a file with curl; finished files are reused on later runs
+# Downloads a file with curl and verifies its SHA-256 when one is given.
+# Finished files are reused; an interrupted download is resumed.
 download_file() {
-    local url="$1"
-    local dest="$2"
+    local url="$1" dest="$2" sha="${3:-}"
 
     if [ -s "$dest" ]; then
         info "Using cached $(basename "$dest")"
-        return 0
+    else
+        info "Downloading $url"
+        curl -fL --retry 3 --connect-timeout 30 -C - -o "$dest.part" "$url" ||
+            # A partial file that cannot be resumed (stale, or no byte-range
+            # support) is dropped so the next attempt starts from scratch
+            { rm -f "$dest.part"; curl -fL --retry 3 --connect-timeout 30 -o "$dest.part" "$url"; }
+        mv "$dest.part" "$dest"
     fi
-    info "Downloading $url"
-    curl -fL --retry 3 --connect-timeout 30 -o "$dest.part" "$url"
-    mv "$dest.part" "$dest"
+
+    if [ -n "$sha" ] && ! printf '%s  %s\n' "$sha" "$dest" | sha256sum -c --status; then
+        rm -f "$dest"
+        die "Checksum mismatch for $(basename "$dest") — the download may be tampered with or corrupt. It has been deleted; run the script again to re-download it."
+    fi
 }
 
 # Extracts a source tarball exactly once. A marker file makes interrupted
@@ -357,6 +352,24 @@ cross_compiler_works() {
     return 1
 }
 
+# Configures, builds and installs one component into $CROSS_PREFIX, teeing
+# all output to the log. Arguments: label, source dir, build dir, log, make
+# build goals, make install goals, then the configure flags. Binutils builds
+# everything with an empty build goal.
+build_component() {
+    local label="$1" srcdir="$2" builddir="$3" log="$4" build_tgt="$5" install_tgt="$6"
+    shift 6
+    if ! (
+        cd "$builddir" &&
+        "$srcdir/configure" --target=i686-elf --prefix="$CROSS_PREFIX" "$@" &&
+        make -j"$JOBS" $build_tgt &&
+        make $install_tgt
+    ) 2>&1 | tee "$log"; then
+        tail -n 20 "$log" >&2 || true
+        die "$label build failed (full log: $log)."
+    fi
+}
+
 # Builds and installs the i686-elf cross compiler (binutils + GCC) from GNU
 # sources when i686-elf-gcc/i686-elf-ld are not already available.
 ensure_cross_compiler() {
@@ -383,9 +396,6 @@ ensure_cross_compiler() {
             die "Host tool '$t' is missing; it should come with the packages — install it manually and run the script again."
     done
 
-    local jobs
-    jobs="${OPENKERNEL_BUILD_JOBS:-$(nproc 2>/dev/null || echo 2)}"
-
     mkdir -p "$WORK_DIR"
 
     # GCC sources, build trees and logs need several GB of disk space
@@ -407,50 +417,25 @@ ensure_cross_compiler() {
     mkdir -p "$src" "$extract" "$WORK_DIR/build-binutils" "$WORK_DIR/build-gcc"
 
     download_file "https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_VERSION.tar.xz" \
-        "$src/binutils-$BINUTILS_VERSION.tar.xz"
+        "$src/binutils-$BINUTILS_VERSION.tar.xz" "$BINUTILS_SHA256"
     download_file "https://ftp.gnu.org/gnu/gcc/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.xz" \
-        "$src/gcc-$GCC_VERSION.tar.xz"
+        "$src/gcc-$GCC_VERSION.tar.xz" "$GCC_SHA256"
 
     extract_once "$src/binutils-$BINUTILS_VERSION.tar.xz" "$extract" "binutils-$BINUTILS_VERSION"
     extract_once "$src/gcc-$GCC_VERSION.tar.xz" "$extract" "gcc-$GCC_VERSION"
 
     info "Building binutils (log: $WORK_DIR/build-binutils.log)..."
-    if ! (
-        cd "$WORK_DIR/build-binutils" &&
-        "$extract/binutils-$BINUTILS_VERSION/configure" \
-            --target=i686-elf \
-            --prefix="$CROSS_PREFIX" \
-            --disable-nls \
-            --disable-werror \
-            --disable-gprofng &&
-        make -j"$jobs" &&
-        make install
-    ) 2>&1 | tee "$WORK_DIR/build-binutils.log"; then
-        tail -n 20 "$WORK_DIR/build-binutils.log" >&2 || true
-        die "binutils build failed (full log: $WORK_DIR/build-binutils.log)."
-    fi
+    build_component binutils "$extract/binutils-$BINUTILS_VERSION" \
+        "$WORK_DIR/build-binutils" "$WORK_DIR/build-binutils.log" \
+        "" install --disable-nls --disable-werror --disable-gprofng
 
     info "Building GCC (log: $WORK_DIR/build-gcc.log, this is the slow part)..."
-    if ! (
-        cd "$WORK_DIR/build-gcc" &&
-        "$extract/gcc-$GCC_VERSION/configure" \
-            --target=i686-elf \
-            --prefix="$CROSS_PREFIX" \
-            --enable-languages=c \
-            --without-headers \
-            --disable-multilib \
-            --disable-nls \
-            --disable-werror \
-            --disable-threads \
-            --disable-libssp \
-            --disable-libgomp \
-            --disable-libquadmath &&
-        make -j"$jobs" all-gcc all-target-libgcc &&
-        make install-gcc install-target-libgcc
-    ) 2>&1 | tee "$WORK_DIR/build-gcc.log"; then
-        tail -n 20 "$WORK_DIR/build-gcc.log" >&2 || true
-        die "GCC build failed (full log: $WORK_DIR/build-gcc.log)."
-    fi
+    build_component GCC "$extract/gcc-$GCC_VERSION" \
+        "$WORK_DIR/build-gcc" "$WORK_DIR/build-gcc.log" \
+        "all-gcc all-target-libgcc" "install-gcc install-target-libgcc" \
+        --enable-languages=c --without-headers --disable-multilib --disable-nls \
+        --disable-werror --disable-threads --disable-libssp --disable-libgomp \
+        --disable-libquadmath
 
     info "Smoke-testing the new toolchain..."
     if ! cross_compiler_works; then
@@ -463,6 +448,23 @@ ensure_cross_compiler() {
     rm -rf "$WORK_DIR/build-binutils" "$WORK_DIR/build-gcc" "$extract"
 }
 
+# Returns 0 when QEMU can serve '-audiodev pa'. QEMU 8+ loads the backend
+# from a module (qemu/audio-pa.so) instead of linking it into the emulator,
+# so `ldd` on qemu-system-i386 alone reports a false negative.
+qemu_pa_backend() {
+    local qemu_bin mod
+    qemu_bin="$(command -v qemu-system-i386 2>/dev/null)" || return 1
+
+    # Older builds link libpulse straight into the emulator
+    ldd "$qemu_bin" 2>/dev/null | grep -q libpulse && return 0
+
+    for mod in /usr/lib/qemu/audio-pa.so /lib/qemu/audio-pa.so /usr/lib/*/qemu/audio-pa.so; do
+        [ -f "$mod" ] || continue
+        ldd "$mod" 2>/dev/null | grep -q libpulse && return 0
+    done
+    return 1
+}
+
 # Prints a checklist of every tool the Makefile needs; returns non-zero if a
 # required tool is missing.
 verify_tools() {
@@ -473,9 +475,9 @@ verify_tools() {
     info "Verification (tools used by the Makefile):"
     for t in "${REQUIRED_TOOLS[@]}"; do
         if path="$(command -v "$t" 2>/dev/null)"; then
-            printf '  %s✔ %-18s%s %s\n' "$C_GREEN" "$t" "$C_RESET" "$path"
+            row_ok "$t" "$path"
         else
-            printf '  %s✖ %-18s missing%s\n' "$C_RED" "$t" "$C_RESET"
+            row_bad "$t" "missing"
             missing=$((missing + 1))
         fi
     done
@@ -483,41 +485,35 @@ verify_tools() {
     # A cross compiler that cannot compile is as good as missing
     if command -v i686-elf-gcc >/dev/null 2>&1; then
         if cross_compiler_works; then
-            printf '  %s✔ %-18s%s compiles and links a test file\n' \
-                "$C_GREEN" "i686-elf-gcc test" "$C_RESET"
+            row_ok "i686-elf-gcc test" "compiles and links a test file"
         else
-            printf '  %s✖ %-18s installed but failed to compile%s\n' \
-                "$C_RED" "i686-elf-gcc test" "$C_RESET"
+            row_bad "i686-elf-gcc test" "installed but failed to compile"
             missing=$((missing + 1))
         fi
     fi
 
     # grub-mkrescue needs the 32-bit PC modules to build the ISO
     if [ -d /usr/lib/grub/i386-pc ]; then
-        printf '  %s✔ %-18s%s /usr/lib/grub/i386-pc\n' "$C_GREEN" "grub i386-pc modules" "$C_RESET"
+        row_ok "grub i386-pc modules" "/usr/lib/grub/i386-pc"
     else
-        printf '  %s✖ %-18s missing (grub-pc-bin / grub2-pc-modules / grub)%s\n' \
-            "$C_RED" "grub i386-pc modules" "$C_RESET"
+        row_bad "grub i386-pc modules" "missing (grub-pc-bin / grub2-pc-modules / grub)"
         missing=$((missing + 1))
     fi
 
     for t in "${OPTIONAL_TOOLS[@]}"; do
         if path="$(command -v "$t" 2>/dev/null)"; then
-            printf '  %s✔ %-18s%s %s (optional)\n' "$C_GREEN" "$t" "$C_RESET" "$path"
+            row_ok "$t" "$path (optional)"
         else
-            printf '  %s⚠ %-18s missing (optional)%s\n' "$C_YELLOW" "$t" "$C_RESET"
+            row_warn "$t" "missing (optional)"
         fi
     done
 
     # 'make run' attaches a Sound Blaster 16 through QEMU's '-audiodev pa'
-    local qemu_bin=""
-    qemu_bin="$(command -v qemu-system-i386 2>/dev/null || true)"
-    if [ -n "$qemu_bin" ] && command -v ldd >/dev/null 2>&1; then
-        if ldd "$qemu_bin" 2>/dev/null | grep libpulse >/dev/null; then
-            printf '  %s✔ %-18s%s linked against libpulse\n' "$C_GREEN" "qemu pa backend" "$C_RESET"
+    if command -v qemu-system-i386 >/dev/null 2>&1 && command -v ldd >/dev/null 2>&1; then
+        if qemu_pa_backend; then
+            row_ok "qemu pa backend" "PulseAudio backend available"
         else
-            printf '  %s⚠ %-18s QEMU has no PulseAudio backend, "make run" may fail%s\n' \
-                "$C_YELLOW" "qemu pa backend" "$C_RESET"
+            row_warn "qemu pa backend" "QEMU has no PulseAudio backend, \"make run\" may fail"
         fi
     fi
 
@@ -549,10 +545,14 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-printf '%s\n' "======================================"
-printf '%s\n' "  OpenKernel Dev Environment Setup"
-printf '%s\n' "======================================"
-echo ""
+# Conflicting flags are rejected before anything else runs
+if [ "$SKIP_UPDATE" = 1 ] && [ "$UPGRADE" = 1 ]; then
+    die "--skip-update and --upgrade cannot be combined."
+fi
+
+printf '%s\n' "======================================" \
+    "  OpenKernel Dev Environment Setup" \
+    "======================================" ""
 
 if [ "$VERIFY_ONLY" = 1 ]; then
     verify_tools || exit 1
