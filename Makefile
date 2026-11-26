@@ -143,6 +143,9 @@ iso: $(KERNEL)
 	grub-mkrescue -o $(ISOFILE) $(ISO)
 	test -f disk.img || qemu-img create disk.img 25M
 
+kernel_api:
+	$(MAKE) -C KernelAPI
+
 # Run
 # This refers to the execution section. (If you're familiar with QEMU parameters, you can modify this section.)
 run: iso
