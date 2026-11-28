@@ -97,7 +97,7 @@ Bu bölümdeki hiçbir şey çalıştırılmamıştır. "Çalışır" ifadesi "t
 | Kilitlemeli işlev kayıt listesi | `kernel_func.c` derlenir (bir kullanılmayan değişken uyarısı) |
 | Panik işleyicisi | `panic.c` derlenir |
 | Kapatma / yeniden başlatma | `sysmng.c` derlenir; syscall sarmalayıcıları artık `"shutdown"` / `"reboot"` geçirdiğinden dal erişilebilir durumda |
-| 4 MiB için kimlik eşlemeli (identity map) sayfalama | `vmem.c` derlenir, hiç çağrılmaz |
+| 4 GiB sanal adres alanı, isteğe bağlı sayfalama ve swap | `vmem.c` derlenir; **QEMU'da doğrulandı**: demand-zero, MMIO eşleme, swap-out/in bütünlüğü, yeniden init, eski `paging_init()` |
 | OFS oluşturma/okuma/yazma/silme/listeleme | `ofs.c` derlenir; işaretçi aritmetiği, superblock giriş/çıkışı ve tablo kalıcılığı düzeltildi |
 | Kesme stub'ları ve dağıtım | `isr.asm` nasm ile derlenir, `interrupt.c` / `pic.c` derlenir |
 | SB16 doğrudan DAC oynatma | `sb16.c` derlenir, DMA veya IRQ yok |
@@ -141,8 +141,8 @@ Bu bölümdeki hiçbir şey çalıştırılmamıştır. "Çalışır" ifadesi "t
 - Gerçek öncelik alanlı (preemptive) çoklu görev veya bağlam değişimi
 - Kullanıcı alanı syscall kapısı (`int 0x80`, `sysenter`, ring geçişleri)
 - `printf` veya herhangi bir varargs biçimlendirme
-- Serbest liste bellek tahsisi, bellek geri kazanımı, sanal-fiziksel eşleme API'si
-- Sayfa hatası (page fault) işleme
+- Serbest liste bellek tahsisi ile bellek geri kazanımı (sanal-fiziksel eşleme API'si artık `vmem.c` içinde)
+- Süreç izolasyonu, ring 3 adres alanları ve SMP kilitleri (sanal bellek tek CPU içindir)
 - OFS'te dizin desteği, FAT12/FAT16'da alt dizin okumaları ve FAT sürücüleri üzerinden alt dizin oluşturma
 - FAT biçimlendirme - FAT sürücüleri mevcut bir birimi bağlar ve yazar, ancak projede önyükleme sektörünü yazan bir şey yok
 - Bağlama tablosu veya gerçek bir VFS soyutlaması

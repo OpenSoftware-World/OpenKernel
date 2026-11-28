@@ -102,35 +102,152 @@ void exit_program(const char *mode, const char *message);
 
 ## 4. Sanal bellek - `Kernel/KernelServices/VirtualMem/vmem.c`
 
+32-bit adres alanının (4 GiB) tamamını kullanılabilir hale getiren, isteğe bağlı sayfalama (demand paging) ve takılabilir swap arka ucu sunan bir alt sistemdir. Fiziksel RAM'in üstüne çıkmadan, yani ek RAM gerektirmeden büyük sanal tamponlar tahsis edebilirsiniz: her sayfa yalnızca ilk dokunuşta RAM'e bağlanır, RAM dolduğunda ise ikinci şans (second-chance) algoritmasıyla swap alanına taşınır.
+
+### Genel API
+
 ```c
-void paging_init(void);
-void load_page_dir(uint32_t *pd);
-void enable_paging(void);
+int  vmem_init(const vmem_config_t *config);
+void vmem_install_fault_handler(void);
+
+int  vmem_swap_set_backend(const vmem_swap_backend_t *backend, uint32_t slots);
+
+void *vmem_alloc(uint32_t size);                       /* WRITE | SWAPPABLE */
+void *vmem_alloc_ex(uint32_t size, uint32_t flags);
+int  vmem_free(void *ptr);
+
+int  vmem_region_add(uint32_t vaddr, uint32_t size, uint32_t flags);
+int  vmem_region_remove(uint32_t vaddr);
+int  vmem_region_find(uint32_t vaddr, uint32_t *start, uint32_t *end,
+                      uint32_t *flags);
+
+int  vmem_map_page(uint32_t vaddr, uint32_t paddr, uint32_t flags);
+int  vmem_unmap_page(uint32_t vaddr);
+uint32_t vmem_get_physical(uint32_t vaddr);
+
+void *vmem_map_mmio(uint32_t paddr, uint32_t size, uint32_t flags);
+int  vmem_unmap_mmio(void *vaddr, uint32_t size);
+
+void vmem_invlpg(uint32_t vaddr);
+void vmem_flush_tlb(void);
+void vmem_get_stats(vmem_stats_t *out);
 ```
 
-`vmem.h` içinde tanımlı bayraklar:
+`vmem.h` içinde tanımlı bayraklar (Intel SDM, cilt 3):
 
 ```c
-#define PAGE_PRESENT 0x1
-#define PAGE_RW      0x2
-#define PAGE_USER    0x4
+#define PAGE_PRESENT  0x001u   #define PAGE_PSE     0x080u
+#define PAGE_RW       0x002u   #define PAGE_GLOBAL  0x100u
+#define PAGE_USER     0x004u   #define PAGE_ACCESSED 0x020u
+#define PAGE_PWT      0x008u   #define PAGE_DIRTY   0x040u
+#define PAGE_PCD      0x010u
+```
+
+Buna ek olarak sanal bellek bölgesi (region) bayrakları:
+
+```c
+#define VMEM_REGION_WRITE      0x001u
+#define VMEM_REGION_USER       0x002u
+#define VMEM_REGION_SWAPPABLE  0x004u
 ```
 
 ### Yaptıkları
 
-`paging_init()`, hem `__attribute__((aligned(4096)))` ile bildirilen statik dizi olan tek bir sayfa dizini hem de bir sayfa tablosu oluşturur. **İlk 4 MiB'yi kimlik eşlemesine (identity map) alır** - sanal adres N, fiziksel adres N'ye eşlenir - ardından:
+`vmem_init()`, `vmem_config_t` ile verilen fiziksel RAM aralığını (`phys_start`-`phys_end`) çerçeve ayırıcısına (frame allocator) kaydeder ve **RAM'in tamamını kimlik eşlemesine (identity map) alır**:
 
-1. Sayfa dizini girişini (giriş 0) ilk sayfa tablosuna yönlendirir.
-2. Dizini `load_page_dir()` ile CR3'e yükler.
-3. `enable_paging()` ile CR0'un 31. bitini (sayfalama etkinleştirme) ayarlar.
+- İlk 4 MiB, 4 KiB'lik sayfa tablosuyla eşlenir (çekirdek, yığın, VGA tamponu buradadır).
+- 4 MiB'in üstü, 4 MiB'lik PSE sayfalarıyla eşlenir; böylece kare (frame) ve paylaşım tamponları fiziksel adresleriyle doğrudan erişilebilir kalır.
+- Sanal tahsisler için `arena_start`-`arena_end` aralığı ayrılır. `0` verilirse arena, kimlik eşlemeli RAM'in hemen üstüne otomatik yerleştirilir (varsayılan `0xFFFFF000`'e kadar).
 
-### Yapmadıkları
+Ardından sayfalama açılır ve `install_fault_handler` açıksa 14. vektöre (sayfa hatası) işleyici bağlanır. İşleyici:
 
-- 1024 olası sayfa dizini girişinden yalnızca 1'ini eşler; dolayısıyla adres alanının yalnızca 4 MiB'si geçerlidir. Bundan sonraki erişimler sayfa hatası (page fault) verir.
-- `PAGE_USER` hiçbir girişe uygulanmaz; kullanıcı/yönetici ayrımı yoktur.
-- Henüz bir sayfa hatası (page fault) işleyicisi yoktur. Artık bir IDT vardır (6. bölüm); bu nedenle `interrupt_register_handler(14, ...)` ile biri eklenebilir; bu olana kadar bir hata, varsayılan dağıtım yolu üzerinden çekirdeği paniğe sokar.
-- Dinamik tahsis için eşleme/kaldırma (map/unmap) işlevi yoktur, üst yarı (higher-half) düzeni yoktur ve TLB yönetimi yoktur.
-- **Depoda `paging_init()`'i çağıran hiçbir şey yoktur.** Sayfalama etkinleştirmek tamamen giriş noktanıza bağlıdır ve bunu yalnızca bir hata işleyiciniz olduğunda ya da tüm erişimlerinizin eşlenmiş aralıkta olduğundan eminseniz yapmalısınız.
+1. Hatayı yapan adresi CR2'den okur, bölgeyi bulur.
+2. Giriş `VMEM_PTE_SWAP` taşıyorsa swap arka ucundan sayfayı RAM'e geri okur (swap-in).
+3. Giriş boşsa sıfırla doldurulmuş yeni bir çerçeve bağlar (demand-zero).
+4. Boş çerçeve yoksa ikinci şans algoritmasıyla erişilmiş (accessed) sayfaları atlar, erişilmemiş swappable sayfaları swap'e yazar (swap-out) ve çerçeveyi yeniden kullanır.
+
+Sayfa tabloları istek üzerine oluşturulur ve son kullanıcı kaldırıldığında yıkılır; TLB `vmem_invlpg()` / `vmem_flush_tlb()` ile yönetilir.
+
+### Swap arka ucu sözleşmesi
+
+Sanal bellek katmanı belirli bir disk sürücüsüne bağlı değildir. Swap, aşağıdaki geri çağırma (callback) çiftiyle yapılır:
+
+```c
+typedef int (*vmem_swap_read_t)(void *context, uint32_t slot, void *page);
+typedef int (*vmem_swap_write_t)(void *context, uint32_t slot, const void *page);
+
+typedef struct {
+    vmem_swap_read_t  read;
+    vmem_swap_write_t write;
+    void *context;
+} vmem_swap_backend_t;
+```
+
+Kurallar:
+
+- `read`/`write` tam olarak bir 4 KiB sayfa okur/yazar; `0` dönüşü başarıdır.
+- **Kesmeler kapalıyken çağrılırlar** (sayfa hatası işleyicisi interrupt gate üzerinden çalışır) ve kendileri sayfa hatası üretmemelidir. Bu yüzden tamponları ve sürücü durumları önceden RAM'de, tercihen swappable olmayan bellekte olmalıdır.
+- `vmem_swap_set_backend()` ilk tahliyeden (eviction) önce çağrılmalıdır. `vmem_init()` arka ucu sıfırladığı için backend **init'ten sonra** kurulmalıdır. Slot sayısı 1 GiB'lik üst sınıra kırpılır.
+
+### Entegrasyon örneği
+
+```c
+#include <OpenKernel/Kernel/Components/InterruptServices/interrupt.h>
+#include <OpenKernel/Kernel/KernelServices/VirtualMem/vmem.h>
+
+static int disk_swap_read(void *ctx, uint32_t slot, void *page);
+static int disk_swap_write(void *ctx, uint32_t slot, const void *page);
+
+void kernel_main(void)
+{
+    vga_init();
+    heap_init(_heap_start, 0x100000);
+    interrupt_init();                       /* IDT önce gelmeli */
+
+    vmem_config_t cfg = {
+        .phys_start = PAGE_ALIGN((uint32_t)(uintptr_t)_kernel_end),
+        .phys_end   = 64u * 1024u * 1024u,  /* bootloader'dan alın */
+        .arena_start = 0,                    /* otomatik */
+        .arena_end   = 0,
+        .install_fault_handler = true,
+    };
+    if (vmem_init(&cfg) != 0) panic("vmem_init");
+
+    vmem_swap_backend_t swap = {
+        .read = disk_swap_read,
+        .write = disk_swap_write,
+        .context = NULL,
+    };
+    vmem_swap_set_backend(&swap, 4096);      /* 16 MiB swap alanı */
+
+    /* Büyük tampon: RAM'de yalnızca dokunulan sayfalar durur. */
+    uint8_t *buf = vmem_alloc(32u * 1024u * 1024u);
+    if (buf == NULL) panic("vmem_alloc");
+    buf[0] = 1;                              /* ilk sayfa burada bağlanır */
+
+    /* Kesme bağlamında kullanılacak bellek swap edilmemeli. */
+    void *irq_buf = vmem_alloc_ex(PAGE_SIZE, VMEM_REGION_WRITE);
+
+    vmem_stats_t st;
+    vmem_get_stats(&st);                     /* st.evictions, st.free_frames ... */
+
+    vmem_free(buf);                          /* çerçeveleri ve swap slotlarını bırakır */
+}
+```
+
+### Yapmadıkları / sınırlamalar
+
+- Arena bir bump (ileri yürüyen) ayırıcıdır: `vmem_free()` fiziksel çerçeveleri ve swap slotlarını geri verir, ancak **sanal adres aralığını yeniden kullanıma açmaz**. Uzun ömürlü, sürekli ayır/serbest döngüsü için arena tükenebilir.
+- Üst yarı (higher-half) çekirdek düzeni yoktur; çekirdek kimlik eşlemeli düşük bellekte kalır.
+- `VMEM_REGION_USER` biti PTE'lere yazılır ama ring 3 geçişi, TSS veya ayrı adres alanları bu alt sistemin kapsamında değildir. Süreç (process) izolasyonu yoktur.
+- Sayfa değiştirme (page replacement) yalnızca second-chance'tır; çalışma kümesi (working set) analizi veya LRU yoktur. Aşırı yük altında thrashing mümkündür.
+- Her şey tek CPU içindir; SMP kilidi yoktur, yalnızca kesme bayrağı koruması (`vmem_lock`) vardır.
+- `phys_start`/`phys_end` çağıran tarafından verilir; multiboot bellek haritası okunmaz. Bootloader'ınızın bildirdiği kullanılabilir RAM aralığını siz geçirmelisiniz.
+- `paging_init()` geriye uyumluluk için korunmuştur: yalnızca ilk 4 MiB'i kimlik eşler ve sayfalamayı açar. Yeni kod `vmem_init()` kullanmalıdır.
+
+### Dürüst değerlendirme
+
+QEMU üzerinde doğrulanan senaryolar: isteğe bağlı sıfır sayfalar, fiziksel MMIO eşleme, 96 çerçeveli küçük RAM'de 160 sayfalık tamponun swap'e taşınıp veri bütünlüğüyle geri okunması, tekrar `vmem_init()` ve eski `paging_init()` uyumluluğu. Test sonunda çerçeve, sayfa tablosu ve swap slotu sızıntısı gözlenmedi. Yine de bu bir çekirdek alt sistemidir: gerçek disk sürücüsü üzerinde swap, eşzamanlı süreçler ve düşük bellek koşulları henüz test edilmedi.
 
 ## 5. Güvenlik denetleyicisi - `Kernel/KernelServices/SecurityChecker/security.c`
 
@@ -248,8 +365,9 @@ void kernel_main(void)
 
     kbd_init();                     /* 4. input                              */
 
-    /* 5. optional: paging only once you have a fault handler */
-    /* paging_init();               */
+    /* 5. virtual memory: all RAM identity-mapped, demand paging on */
+    /* vmem_config_t cfg = { ... }; vmem_init(&cfg);                 */
+    /* vmem_swap_set_backend(&swap, slots);  // after vmem_init()   */
 
     /* 6. optional: diagnostics */
     /* securchk_result_t r; securchk_run(&r); */

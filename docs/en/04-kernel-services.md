@@ -102,35 +102,152 @@ Both end in an infinite `hlt` loop and never return.
 
 ## 4. Virtual memory - `Kernel/KernelServices/VirtualMem/vmem.c`
 
+A subsystem that makes the whole 32-bit address space (4 GiB) usable and provides demand paging plus a pluggable swap backend. You can allocate large virtual buffers without needing more physical RAM: each page is bound to RAM only on first touch, and when RAM fills up, second-chance replacement moves pages to swap space.
+
+### Public API
+
 ```c
-void paging_init(void);
-void load_page_dir(uint32_t *pd);
-void enable_paging(void);
+int  vmem_init(const vmem_config_t *config);
+void vmem_install_fault_handler(void);
+
+int  vmem_swap_set_backend(const vmem_swap_backend_t *backend, uint32_t slots);
+
+void *vmem_alloc(uint32_t size);                       /* WRITE | SWAPPABLE */
+void *vmem_alloc_ex(uint32_t size, uint32_t flags);
+int  vmem_free(void *ptr);
+
+int  vmem_region_add(uint32_t vaddr, uint32_t size, uint32_t flags);
+int  vmem_region_remove(uint32_t vaddr);
+int  vmem_region_find(uint32_t vaddr, uint32_t *start, uint32_t *end,
+                      uint32_t *flags);
+
+int  vmem_map_page(uint32_t vaddr, uint32_t paddr, uint32_t flags);
+int  vmem_unmap_page(uint32_t vaddr);
+uint32_t vmem_get_physical(uint32_t vaddr);
+
+void *vmem_map_mmio(uint32_t paddr, uint32_t size, uint32_t flags);
+int  vmem_unmap_mmio(void *vaddr, uint32_t size);
+
+void vmem_invlpg(uint32_t vaddr);
+void vmem_flush_tlb(void);
+void vmem_get_stats(vmem_stats_t *out);
 ```
 
-Flags defined in `vmem.h`:
+Flags defined in `vmem.h` (Intel SDM volume 3):
 
 ```c
-#define PAGE_PRESENT 0x1
-#define PAGE_RW      0x2
-#define PAGE_USER    0x4
+#define PAGE_PRESENT  0x001u   #define PAGE_PSE     0x080u
+#define PAGE_RW       0x002u   #define PAGE_GLOBAL  0x100u
+#define PAGE_USER     0x004u   #define PAGE_ACCESSED 0x020u
+#define PAGE_PWT      0x008u   #define PAGE_DIRTY   0x040u
+#define PAGE_PCD      0x010u
+```
+
+Plus the region flags:
+
+```c
+#define VMEM_REGION_WRITE      0x001u
+#define VMEM_REGION_USER       0x002u
+#define VMEM_REGION_SWAPPABLE  0x004u
 ```
 
 ### What it does
 
-`paging_init()` builds a single page directory and one page table, both declared `__attribute__((aligned(4096)))` as static arrays. It **identity-maps the first 4 MiB** - virtual address N maps to physical address N - then:
+`vmem_init()` registers the physical RAM range given in `vmem_config_t` (`phys_start`-`phys_end`) with the frame allocator and **identity-maps all of it**:
 
-1. Points page directory entry 0 at the first page table.
-2. Loads the directory into CR3 via `load_page_dir()`.
-3. Sets CR0 bit 31 (paging enable) via `enable_paging()`.
+- The first 4 MiB use 4 KiB page tables (kernel, stack, VGA buffer live here).
+- Above 4 MiB, 4 MiB PSE pages are used, so frame and shared buffers stay reachable at their physical addresses.
+- A virtual range (`arena_start`-`arena_end`) is reserved for allocations. If both are `0`, the arena is placed automatically just above the identity-mapped RAM (up to the default `0xFFFFF000`).
 
-### What it does not do
+Then paging is enabled and, if `install_fault_handler` is set, a handler is attached to vector 14 (page fault). The handler:
 
-- It maps only 1 of the 1024 possible page directory entries, so only 4 MiB of the address space is valid. Access beyond that faults.
-- `PAGE_USER` is never applied to any entry; there is no user/supervisor distinction.
-- There is no page fault handler yet. An IDT now exists (section 6), so one could be attached with `interrupt_register_handler(14, ...)`; until that happens a fault panics the kernel through the default dispatch path.
-- There is no map/unmap function for dynamic allocation, no higher-half layout, and no TLB management.
-- **Nothing in the repository calls `paging_init()`.** Enabling paging is entirely up to your entry point, and you should only do so once you have a fault handler or you are certain all your accesses fall in the mapped range.
+1. Reads the faulting address from CR2 and locates the region.
+2. If the entry carries `VMEM_PTE_SWAP`, reads the page back from the swap backend (swap-in).
+3. If the entry is empty, binds a freshly zeroed frame (demand-zero).
+4. If no frame is free, uses second-chance: it skips accessed pages, writes unaccessed swappable pages to swap (swap-out) and reuses the frame.
+
+Page tables are created on demand and torn down when their last user is removed; the TLB is managed with `vmem_invlpg()` / `vmem_flush_tlb()`.
+
+### Swap backend contract
+
+The VM layer is not tied to a particular disk driver. Swapping goes through this callback pair:
+
+```c
+typedef int (*vmem_swap_read_t)(void *context, uint32_t slot, void *page);
+typedef int (*vmem_swap_write_t)(void *context, uint32_t slot, const void *page);
+
+typedef struct {
+    vmem_swap_read_t  read;
+    vmem_swap_write_t write;
+    void *context;
+} vmem_swap_backend_t;
+```
+
+Rules:
+
+- `read`/`write` move exactly one 4 KiB page; returning `0` means success.
+- **They are called with interrupts disabled** (the page fault handler runs through an interrupt gate) and must not fault themselves. Keep their buffers and driver state in RAM, ideally in non-swappable memory.
+- Call `vmem_swap_set_backend()` before the first eviction. `vmem_init()` resets the backend, so register it **after** init. The slot count is clamped to a 1 GiB upper limit.
+
+### Integration example
+
+```c
+#include <OpenKernel/Kernel/Components/InterruptServices/interrupt.h>
+#include <OpenKernel/Kernel/KernelServices/VirtualMem/vmem.h>
+
+static int disk_swap_read(void *ctx, uint32_t slot, void *page);
+static int disk_swap_write(void *ctx, uint32_t slot, const void *page);
+
+void kernel_main(void)
+{
+    vga_init();
+    heap_init(_heap_start, 0x100000);
+    interrupt_init();                       /* IDT must exist first */
+
+    vmem_config_t cfg = {
+        .phys_start = PAGE_ALIGN((uint32_t)(uintptr_t)_kernel_end),
+        .phys_end   = 64u * 1024u * 1024u,  /* from your bootloader */
+        .arena_start = 0,                    /* automatic */
+        .arena_end   = 0,
+        .install_fault_handler = true,
+    };
+    if (vmem_init(&cfg) != 0) panic("vmem_init");
+
+    vmem_swap_backend_t swap = {
+        .read = disk_swap_read,
+        .write = disk_swap_write,
+        .context = NULL,
+    };
+    vmem_swap_set_backend(&swap, 4096);      /* 16 MiB of swap */
+
+    /* Large buffer: only touched pages stay resident. */
+    uint8_t *buf = vmem_alloc(32u * 1024u * 1024u);
+    if (buf == NULL) panic("vmem_alloc");
+    buf[0] = 1;                              /* binds the first page now */
+
+    /* Memory used from interrupt context must not be swapped. */
+    void *irq_buf = vmem_alloc_ex(PAGE_SIZE, VMEM_REGION_WRITE);
+
+    vmem_stats_t st;
+    vmem_get_stats(&st);                     /* st.evictions, st.free_frames ... */
+
+    vmem_free(buf);                          /* releases frames and swap slots */
+}
+```
+
+### What it does not do / limitations
+
+- The arena is a bump allocator: `vmem_free()` returns physical frames and swap slots, but it **does not recycle the virtual address range**. A long-lived alloc/free loop can exhaust the arena.
+- There is no higher-half kernel layout; the kernel stays in the identity-mapped low memory.
+- `VMEM_REGION_USER` is written into PTEs, but ring-3 transitions, a TSS and separate address spaces are out of scope. There is no process isolation.
+- Page replacement is second-chance only; no working-set analysis or LRU. Thrashing is possible under heavy pressure.
+- Everything is single-CPU; there is no SMP lock, only interrupt-flag protection (`vmem_lock`).
+- `phys_start`/`phys_end` come from the caller; the multiboot memory map is not parsed. You must pass the usable RAM range your bootloader reports.
+- `paging_init()` is kept for source compatibility: it identity-maps only the first 4 MiB and enables paging. New code should use `vmem_init()`.
+
+### Honest assessment
+
+Scenarios verified under QEMU: demand-zero pages, physical MMIO mapping, a 160-page buffer swapped out and read back with data integrity on a 96-frame RAM budget, a second `vmem_init()` and the legacy `paging_init()` path. The test ended with no frame, page-table or swap-slot leaks. Still, this is a kernel subsystem: swapping over a real disk driver, concurrent processes and low-memory conditions have not been tested yet.
 
 ## 5. Security checker - `Kernel/KernelServices/SecurityChecker/security.c`
 
@@ -248,8 +365,9 @@ void kernel_main(void)
 
     kbd_init();                     /* 4. input                              */
 
-    /* 5. optional: paging only once you have a fault handler */
-    /* paging_init();               */
+    /* 5. virtual memory: all RAM identity-mapped, demand paging on */
+    /* vmem_config_t cfg = { ... }; vmem_init(&cfg);                 */
+    /* vmem_swap_set_backend(&swap, slots);  // after vmem_init()   */
 
     /* 6. optional: diagnostics */
     /* securchk_result_t r; securchk_run(&r); */

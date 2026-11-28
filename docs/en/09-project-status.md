@@ -97,7 +97,7 @@ Most of this section is compile-verified and logic-reviewed only. Where a row sa
 | RTC time reading | `time.c` compiles, CMOS access correct |
 | Function registry with lockdown | `kernel_func.c` compiles clean |
 | Power off / reboot | `sysmng.c` compiles; the syscall wrappers now pass `"shutdown"` / `"reboot"` so the branch is reachable |
-| Identity-mapped paging for 4 MiB | `vmem.c` compiles, never called |
+| 4 GiB virtual address space, demand paging and swap | `vmem.c` compiles; **verified under QEMU**: demand-zero, MMIO mapping, swap-out/in integrity, re-init, legacy `paging_init()` |
 | OFS create/read/write/delete/list | `ofs.c` compiles; pointer arithmetic, superblock I/O and table persistence fixed |
 | Interrupt stubs and dispatch | `isr.asm` assembles with nasm, `interrupt.c` / `pic.c` compile. **Verified under QEMU**: IDT load, PIC remap, `#DE` and real `#GP` frames, PIT tick/EOI, and software-int dispatch all correct |
 | Panic handler | `panic.c` compiles. **Verified under QEMU**: `cli()` added this revision, a panic from task context now really freezes the system (no further timer-driven activity) |
@@ -140,8 +140,8 @@ Most of this section is compile-verified and logic-reviewed only. Where a row sa
 - A per-CPU timer; IRQ0 is driven by the PIT, there is no APIC
 - A userspace syscall gate (`int 0x80`, `sysenter`, ring transitions)
 - `printf` or any varargs formatting
-- Virtual-to-physical mapping API (free-list allocation itself now exists - see section 5)
-- Page fault handling
+- Free-list allocation with memory reclamation (a virtual-to-physical mapping API now exists in `vmem.c`)
+- Process isolation, ring-3 address spaces and SMP locks (the VM layer is single-CPU)
 - Directory support in OFS, subdirectory reads in FAT12/FAT16, and creating subdirectories through the FAT drivers
 - FAT formatting - the FAT drivers mount and write an existing volume, but nothing in the project writes a boot sector
 - A mount table or real VFS abstraction
